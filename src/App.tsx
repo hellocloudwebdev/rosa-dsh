@@ -1,26 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { Sidebar, type Theme } from "./components/Sidebar";
 import { StudioHeader } from "./components/StudioHeader";
-import { AcmeLogo } from "./components/icons/AcmeLogo";
-import { Composer } from "./components/composer/Composer";
-import type { Mode } from "./components/composer/ModeMenu";
-import type { ModelSel } from "./components/composer/ModelMenu";
-import { UpgradeBanner } from "./components/composer/UpgradeBanner";
-import { SuggestedList } from "./components/SuggestedList";
+import { PrimaryWorkspace } from "./components/PrimaryWorkspace";
+import { ViewPanel } from "./components/view/ViewPanel";
 import { EmailPreviewModal } from "./components/EmailPreviewModal";
 import { NewEmailModal } from "./components/NewEmailModal";
 import { TemplatesModal } from "./components/TemplatesModal";
 import { BrandKitModal } from "./components/BrandKitModal";
-import type { NavItemId, GeneratedEmail } from "./types";
-
-interface Msg {
-  id: number;
-  role: "user" | "assistant";
-  text: string;
-  meta: string;
-}
+import type { NavItemId, GeneratedEmail, ViewType, Msg } from "./types";
+import type { Mode } from "./components/composer/ModeMenu";
+import type { ModelSel } from "./components/composer/ModelMenu";
 
 const INITIAL_EMAIL: GeneratedEmail = {
   subject: "Welcome to Acme — Your exclusive 15% discount is inside 🎉",
@@ -42,9 +32,14 @@ const DEFAULT_MODEL: ModelSel = {
   icon: "star",
 };
 
+const VIEW_MIN = 400;
+const VIEW_DEFAULT = 600;
+
 export function App() {
   const [activeNav, setActiveNav] = useState<NavItemId>("new-email");
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(300);
+
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<Mode>("Build");
@@ -54,7 +49,16 @@ export function App() {
   const [banner, setBanner] = useState(true);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [currentEmail, setCurrentEmail] = useState<GeneratedEmail>(INITIAL_EMAIL);
-  const listRef = useRef<HTMLDivElement>(null);
+  const [previousEmail, setPreviousEmail] = useState<GeneratedEmail | null>(null);
+
+  // Conditional View panel — null means closed (no reserved space)
+  const [viewType, setViewType] = useState<ViewType | null>(null);
+  const [viewWidth, setViewWidth] = useState(VIEW_DEFAULT);
+
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isNewEmailOpen, setIsNewEmailOpen] = useState(false);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+  const [isBrandsOpen, setIsBrandsOpen] = useState(false);
 
   const [theme, setTheme] = useState<Theme>(() => {
     try {
@@ -72,17 +76,13 @@ export function App() {
     }
   }, [theme]);
 
-  useEffect(() => {
-    const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading]);
-
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isNewEmailOpen, setIsNewEmailOpen] = useState(false);
-  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
-  const [isBrandsOpen, setIsBrandsOpen] = useState(false);
-
   const engine = auto ? "Auto" : `${model.name} ${model.effort}`;
+
+  // View width cap: 70% of the workspace after the sidebar
+  const viewMax = Math.max(
+    VIEW_MIN,
+    Math.floor((window.innerWidth - (isCollapsed ? 72 : sidebarWidth)) * 0.7)
+  );
 
   const handleGenerate = (promptText: string) => {
     const text = promptText.trim();
@@ -93,6 +93,7 @@ export function App() {
       { id: Date.now(), role: "user", text, meta: `${mode} · ${engine}` },
     ]);
     setIsLoading(true);
+    setViewType("email"); // contextual: show the draft while it's being created
 
     setTimeout(() => {
       const lower = text.toLowerCase();
@@ -156,6 +157,7 @@ export function App() {
         };
       }
 
+      setPreviousEmail(currentEmail);
       setCurrentEmail(emailResult);
       setIsLoading(false);
       setMessages((prev) => [
@@ -176,10 +178,14 @@ export function App() {
         theme === "dark" ? "theme-dark" : "theme-light"
       }`}
     >
-      {/* Left Navigation Sidebar */}
+      {/* Sidebar — independently resizable + collapsible */}
       <Sidebar
         activeItem={activeNav}
-        onSelectItem={setActiveNav}
+        onSelectItem={(id) => {
+          setActiveNav(id);
+          if (id === "brand-images") setViewType("image");
+          else if (id === "history") setViewType("terminal");
+        }}
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
         onOpenNewEmailModal={() => setIsNewEmailOpen(true)}
@@ -187,101 +193,64 @@ export function App() {
         onOpenBrandsModal={() => setIsBrandsOpen(true)}
         theme={theme}
         onSetTheme={setTheme}
+        width={sidebarWidth}
+        onWidthChange={setSidebarWidth}
       />
 
-      {/* Main Studio — Composer only */}
+      {/* Primary area: Unified AI Workspace + conditional View */}
       <div className="flex-1 h-screen flex flex-col overflow-hidden">
         <StudioHeader
           campaignTitle={campaignTitle}
           onChangeTitle={setCampaignTitle}
           onSendTest={() => alert(`Test email sent to your inbox for "${currentEmail.subject}"!`)}
           onDeploy={() => setIsPreviewOpen(true)}
+          viewType={viewType}
+          onOpenView={(t) => setViewType(t)}
         />
 
-        <div className="flex-1 overflow-y-auto flex bg-[var(--bg-app)] transition-colors duration-300">
-          <div className="m-auto w-full max-w-[620px] px-6 py-14 flex flex-col">
-            {/* Transcript */}
-            {(messages.length > 0 || isLoading) && (
-              <div ref={listRef} className="mb-7 space-y-3 max-h-[36vh] overflow-y-auto pr-1">
-                <AnimatePresence initial={false}>
-                  {messages.map((m) => (
-                    <motion.div
-                      key={m.id}
-                      layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="flex gap-2.5"
-                    >
-                      {m.role === "assistant" && (
-                        <AcmeLogo className="w-4 h-4 mt-1 text-[var(--lime-text)] shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p
-                          className={`text-sm leading-relaxed whitespace-pre-wrap ${
-                            m.role === "user"
-                              ? "text-[var(--text-primary)]"
-                              : "text-[var(--text-secondary)]"
-                          }`}
-                        >
-                          {m.text}
-                        </p>
-                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{m.meta}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                  {isLoading && (
-                    <motion.div
-                      key="loading"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-2 text-sm text-[var(--text-secondary)] pl-[26px]"
-                    >
-                      <Sparkles className="w-4 h-4 text-[var(--lime-text)] animate-spin" />
-                      <span>Ace is drafting your email…</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* UnifiedAIWorkspace — conversation + generation + agent activity in ONE area */}
+          <PrimaryWorkspace
+            messages={messages}
+            isLoading={isLoading}
+            prompt={prompt}
+            onPromptChange={setPrompt}
+            onSubmit={() => handleGenerate(prompt)}
+            mode={mode}
+            onModeChange={setMode}
+            model={model}
+            onModelChange={setModel}
+            auto={auto}
+            onAutoChange={setAuto}
+            banner={banner}
+            onDismissBanner={() => setBanner(false)}
+            onSelectSuggestion={(p) => {
+              setPrompt(p);
+              handleGenerate(p);
+            }}
+            theme={theme}
+          />
+
+          {/* Conditional View — contextual visual surface, removed entirely when closed */}
+          <AnimatePresence>
+            {viewType && (
+              <ViewPanel
+                viewType={viewType}
+                onTypeChange={setViewType}
+                onClose={() => setViewType(null)}
+                width={Math.min(viewWidth, viewMax)}
+                onWidthChange={setViewWidth}
+                maxWidth={viewMax}
+                viewProps={{
+                  email: currentEmail,
+                  onEmailChange: setCurrentEmail,
+                  previousEmail,
+                  engine,
+                  isLoading,
+                }}
+              />
             )}
-
-            {/* Hero */}
-            <div className="mb-6">
-              <div className="mb-5">
-                <AcmeLogo className="w-8 h-8 text-[var(--text-primary)]" />
-              </div>
-              <h1 className="text-[30px] font-semibold text-[var(--text-primary)] tracking-[-0.02em] leading-tight transition-colors">
-                Create Emails Worth Opening
-              </h1>
-            </div>
-
-            {/* Video-style composer (follows theme, all animations kept) */}
-            <Composer
-              value={prompt}
-              onValueChange={setPrompt}
-              onSubmit={() => handleGenerate(prompt)}
-              mode={mode}
-              onModeChange={setMode}
-              model={model}
-              onModelChange={setModel}
-              auto={auto}
-              onAutoChange={setAuto}
-              theme={theme}
-            />
-
-            {/* Upgrade banner (same green in both themes) */}
-            <AnimatePresence>
-              {banner && <UpgradeBanner onDismiss={() => setBanner(false)} />}
-            </AnimatePresence>
-
-            {/* Suggestions */}
-            <SuggestedList
-              onSelectPrompt={(p) => {
-                setPrompt(p);
-                handleGenerate(p);
-              }}
-            />
-          </div>
+          </AnimatePresence>
         </div>
       </div>
 

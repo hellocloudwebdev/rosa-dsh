@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type PointerEvent as ReactPointerEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronsLeft,
@@ -36,7 +36,13 @@ interface SidebarProps {
   onOpenBrandsModal: () => void;
   theme: Theme;
   onSetTheme: (t: Theme) => void;
+  /** Expanded width in px (draggable, 240–420, default 300) */
+  width: number;
+  onWidthChange: (w: number) => void;
 }
+
+export const SIDEBAR_MIN = 240;
+export const SIDEBAR_MAX = 420;
 
 const WORKSPACES = [
   { id: "ace-2", name: "Ace Studio 2.0" },
@@ -149,8 +155,27 @@ export function Sidebar({
   onOpenBrandsModal,
   theme,
   onSetTheme,
+  width,
+  onWidthChange,
 }: SidebarProps) {
   const [workspace, setWorkspace] = useState("Ace Studio 2.0");
+
+  const handleResizeStart = (e: ReactPointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    const onMove = (ev: PointerEvent) => {
+      onWidthChange(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, startW + (ev.clientX - startX))));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.cursor = "";
+    };
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   const handleSelect = (id: NavItemId) => {
     onSelectItem(id);
@@ -163,10 +188,10 @@ export function Sidebar({
     <motion.aside
       initial={false}
       animate={{
-        width: isCollapsed ? 72 : 264,
+        width: isCollapsed ? 72 : width,
         transition: { duration: 0.25, ease: [0.16, 1, 0.3, 1] },
       }}
-      className="h-full bg-[var(--bg-panel)] border-r border-[var(--border-subtle)] flex flex-col shrink-0 select-none overflow-hidden z-20 transition-colors"
+      className="relative h-full bg-[var(--bg-panel)] border-r border-[var(--border-subtle)] flex flex-col shrink-0 select-none overflow-hidden z-20 transition-colors"
     >
       <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden p-3.5 pt-5">
         {/* Brand header */}
@@ -329,6 +354,15 @@ export function Sidebar({
           />
         </nav>
       </div>
+
+      {/* Resize handle (drag to resize, 240–420) */}
+      {!isCollapsed && (
+        <div
+          onPointerDown={handleResizeStart}
+          className="absolute inset-y-0 right-0 w-1 cursor-col-resize hover:bg-[var(--lime)]/60 transition-colors z-30"
+          title="Drag to resize sidebar"
+        />
+      )}
 
       {/* Footer: Acme Admin profile + light/dark toggle */}
       <div className="p-3 border-t border-[var(--border-subtle)] transition-colors">

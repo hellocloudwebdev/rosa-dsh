@@ -1,12 +1,18 @@
 import { useState } from "react";
-import { Send, Mail, Users } from "lucide-react";
+import { Send, Mail, Users, PanelRight, ChevronDown, Check } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { AceMoonIcon } from "./icons/AceMoonIcon";
+import { VIEW_LIST } from "./view/views";
+import type { ViewType } from "../types";
 
 interface StudioHeaderProps {
   campaignTitle: string;
   onChangeTitle: (title: string) => void;
   onSendTest: () => void;
   onDeploy: () => void;
+  /** Currently open View type (null = no View open) */
+  viewType: ViewType | null;
+  onOpenView: (t: ViewType) => void;
 }
 
 export function StudioHeader({
@@ -14,6 +20,8 @@ export function StudioHeader({
   onChangeTitle,
   onSendTest,
   onDeploy,
+  viewType,
+  onOpenView,
 }: StudioHeaderProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
 
@@ -62,8 +70,55 @@ export function StudioHeader({
         </div>
       </div>
 
-      {/* Right: actions */}
+      {/* Right: View launcher + actions */}
       <div className="flex items-center gap-2 shrink-0">
+        {/* Open / switch the contextual View panel */}
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors cursor-pointer ${
+                viewType
+                  ? "border-[var(--lime)]/60 bg-[var(--lime)]/15 text-[var(--lime-text)]"
+                  : "border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              <PanelRight className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {viewType ? (VIEW_LIST.find((v) => v.type === viewType)?.label ?? "View") : "Open View"}
+              </span>
+              <ChevronDown className="w-3 h-3 opacity-60" />
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="end"
+              sideOffset={6}
+              className="w-52 bg-[#262e28] rounded-xl p-1.5 border border-white/5 shadow-2xl z-50 focus:outline-none"
+            >
+              <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                Open a View
+              </div>
+              {VIEW_LIST.map((v) => (
+                <DropdownMenu.Item
+                  key={v.type}
+                  onSelect={() => onOpenView(v.type)}
+                  className={`flex items-center justify-between px-2.5 py-2 text-sm rounded-lg cursor-pointer outline-none transition-colors ${
+                    viewType === v.type
+                      ? "bg-white/10 text-white font-medium"
+                      : "text-neutral-300 hover:bg-white/5"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span className="text-[var(--lime-text)]">{v.icon}</span>
+                    {v.label}
+                  </span>
+                  {viewType === v.type && <Check className="w-3.5 h-3.5 text-neutral-200" />}
+                </DropdownMenu.Item>
+              ))}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+
         <button
           onClick={onSendTest}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"

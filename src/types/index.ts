@@ -25,3 +25,22 @@ export interface SuggestionPrompt {
   rest: string;
   fullPrompt: string;
 }
+
+export interface Msg {
+  id: number;
+  role: "user" | "assistant";
+  text: string;
+  meta: string;
+}
+
+/** Contextual visual surfaces shown in the right-hand View panel. */
+export type ViewType =
+  | "email"
+  | "browser"
+  | "code"
+  | "markdown"
+  | "pdf"
+  | "image"
+  | "diff"
+  | "terminal"
+  | "project";
