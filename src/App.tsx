@@ -76,6 +76,15 @@ export function App() {
     }
   }, [theme]);
 
+  // Auto-collapse the sidebar on narrow screens (mobile spec: reduce spacing)
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const apply = () => setIsCollapsed(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
   const engine = auto ? "Auto" : `${model.name} ${model.effort}`;
 
   // View width cap: 70% of the workspace after the sidebar

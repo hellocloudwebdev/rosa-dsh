@@ -59,8 +59,10 @@ export function PrimaryWorkspace({
   }, [messages, isLoading]);
 
   return (
-    <div className="flex-1 min-w-0 h-full overflow-y-auto bg-[var(--bg-app)] transition-colors duration-300">
-      <div className="m-auto w-full max-w-[640px] px-6 py-14 flex flex-col">
+    <div className="flex-1 min-w-0 h-full overflow-y-auto flex flex-col bg-[var(--bg-app)] transition-colors duration-300">
+      {/* Centered content block: width min(100% - 32px, 760px), min 48px top/bottom gap,
+          vertically centered (~45–50% viewport); auto margins degrade to scroll when tall */}
+      <div className="m-auto w-[min(100%_-_32px,_760px)] py-12 flex flex-col">
         {/* Conversation / agent activity transcript */}
         {(messages.length > 0 || isLoading) && (
           <div ref={listRef} className="mb-7 space-y-3 max-h-[36vh] overflow-y-auto pr-1">
