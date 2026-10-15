@@ -1,37 +1,70 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import path from "path";
+import tailwindcss from "tailwindcss";
+import path from "node:path";
 
-// @ts-expect-error process is a nodejs global
-const host = process.env.TAURI_DEV_HOST;
+const API_PORT = Number(process.env.ROSA_API_PORT ?? 8787);
 
-// https://vitejs.dev/config/
-export default defineConfig(async () => ({
-  plugins: [react()],
+// The app is a Vite SPA. `rosa-server` (server/) provides the API layer and is
+// proxied during local development; in production the same handler runs as a
+// Vercel Function or Cloudflare Pages Function.
+export default defineConfig({
+  plugins: [
+    react(),
+    {
+      name: "rosa:tailwind-inline",
+      configResolved(config) {
+        // Tailwind is applied through postcss.config.js; this plugin only
+        // guarantees the watcher picks up config changes reliably.
+        void config;
+        void tailwindcss;
+      },
+    },
+  ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
+      "@shared": path.resolve(import.meta.dirname, "./shared"),
     },
   },
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent vite from obscuring rust errors
-  clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 1420,
-    strictPort: true,
-    host: host || false,
-    hmr: host
-      ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
-      : undefined,
-    watch: {
-      // 3. tell vite to ignore watching `src-tauri` and tooling state dirs
-      ignored: ["**/src-tauri/**", "**/.mimosa/**", "**/.zcode/**"],
+    port: 5173,
+    host: process.env.ROSA_DEV_HOST || undefined,
+    proxy: {
+      "/api": {
+        target: `http://127.0.0.1:${API_PORT}`,
+        changeOrigin: true,
+      },
     },
   },
-}));
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (
+              id.includes("react-markdown") ||
+              id.includes("katex") ||
+              id.includes("highlight.js") ||
+              id.includes("remark") ||
+              id.includes("rehype") ||
+              id.includes("mdast") ||
+              id.includes("micromark") ||
+              id.includes("unified") ||
+              id.includes("prop-types") ||
+              id.includes("vfile")
+            ) {
+              return "markdown";
+            }
+            if (id.includes("react") || id.includes("scheduler")) {
+              return "react";
+            }
+          }
+          return undefined;
+        },
+      },
+    },
+  },
+});

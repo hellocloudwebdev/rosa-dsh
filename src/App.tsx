@@ -1,301 +1,510 @@
-import { useEffect, useState } from "react";
-import { AnimatePresence } from "framer-motion";
-import { Sidebar, type Theme } from "./components/Sidebar";
-import { StudioHeader } from "./components/StudioHeader";
-import { PrimaryWorkspace } from "./components/PrimaryWorkspace";
-import { ViewPanel } from "./components/view/ViewPanel";
-import { EmailPreviewModal } from "./components/EmailPreviewModal";
-import { NewEmailModal } from "./components/NewEmailModal";
-import { TemplatesModal } from "./components/TemplatesModal";
-import { BrandKitModal } from "./components/BrandKitModal";
-import type { NavItemId, GeneratedEmail, ViewType, Msg } from "./types";
-import type { Mode } from "./components/composer/ModeMenu";
-import type { ModelSel } from "./components/composer/ModelMenu";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import type { ApiErrorPayload, StreamEvent, UserProfile } from "../shared/types.js";
+import {
+  ApiClientError,
+  cancelRun,
+  createConversation,
+  deleteConversation,
+  getConversation,
+  getHealth,
+  getSession,
+  listConversations,
+  listModels,
+  listProviders,
+  logout,
+  openChatStream,
+  readChatStream,
+} from "./lib/api.js";
+import { ToastProvider } from "./components/ui/Toast.js";
+import { LoginScreen } from "./components/LoginScreen.js";
+import { AppShell } from "./components/shell/AppShell.js";
+import { Sidebar } from "./components/shell/Sidebar.js";
+import { Workspace } from "./components/workspace/Workspace.js";
+import { reducer, initialState, type Action, type ChatMessageView, type PaneState, type PaneMetrics } from "./state/appState.js";
 
-const INITIAL_EMAIL: GeneratedEmail = {
-  subject: "Welcome to Acme — Your exclusive 15% discount is inside 🎉",
-  previewText: "We're thrilled to have you. Here is everything you need to get started.",
-  headline: "Welcome to a smarter way to craft emails",
-  body: [
-    "Thank you for joining Acme AI. We built Ace Studio with one singular mission: to make every email you send thoughtful, high-converting, and impossible for your subscribers to ignore.",
-    "As a special welcome gift, use the code WELCOME15 at checkout on any plan upgrade or premium template bundle this month.",
-    "Explore your workspace, connect your custom sending domain, and start drafting your first campaign in under two minutes.",
-  ],
-  ctaText: "Claim Your 15% Discount →",
-  ctaLink: "https://acme.ai/claim-offer",
-};
-
-const DEFAULT_MODEL: ModelSel = {
-  id: "fable-5",
-  name: "Fable 5",
-  effort: "High",
-  icon: "star",
-};
-
-const VIEW_MIN = 400;
-const VIEW_DEFAULT = 600;
+type Stage = "booting" | "signed-out" | "signed-in";
 
 export function App() {
-  const [activeNav, setActiveNav] = useState<NavItemId>("new-email");
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(300);
+  return (
+    <ToastProvider>
+      <AppRoot />
+    </ToastProvider>
+  );
+}
 
-  const [prompt, setPrompt] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<Mode>("Build");
-  const [model, setModel] = useState<ModelSel>(DEFAULT_MODEL);
-  const [auto, setAuto] = useState(false);
-  const [campaignTitle, setCampaignTitle] = useState("Q4 Onboarding & Welcome Sequence");
-  const [banner, setBanner] = useState(true);
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [currentEmail, setCurrentEmail] = useState<GeneratedEmail>(INITIAL_EMAIL);
-  const [previousEmail, setPreviousEmail] = useState<GeneratedEmail | null>(null);
+/* ------------------------------------------------------------------ */
+/* Root                                                                */
+/* ------------------------------------------------------------------ */
 
-  // Conditional View panel — null means closed (no reserved space)
-  const [viewType, setViewType] = useState<ViewType | null>(null);
-  const [viewWidth, setViewWidth] = useState(VIEW_DEFAULT);
-
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isNewEmailOpen, setIsNewEmailOpen] = useState(false);
-  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
-  const [isBrandsOpen, setIsBrandsOpen] = useState(false);
-
-  const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      return localStorage.getItem("acme-theme") === "light" ? "light" : "dark";
-    } catch {
-      return "dark";
-    }
-  });
+function AppRoot() {
+  const [stage, setStage] = useState<Stage>("booting");
+  const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("acme-theme", theme);
-    } catch {
-      /* ignore */
-    }
-  }, [theme]);
+    let alive = true;
+    const controller = new AbortController();
 
-  // Auto-collapse the sidebar on narrow screens (mobile spec: reduce spacing)
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 900px)");
-    const apply = () => setIsCollapsed(mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
+    void (async () => {
+      try {
+        const session = await getSession(controller.signal);
+        if (!alive) return;
+        setStage(session.user ? "signed-in" : "signed-out");
+      } catch (err) {
+        if (!alive) return;
+        setBootError(
+          err instanceof ApiClientError
+            ? err.message
+            : "Could not reach the ROSA API. Start the API server (`npm run dev:api`) and reload.",
+        );
+        setStage("signed-out");
+      }
+    })();
+
+    return () => {
+      alive = false;
+      controller.abort();
+    };
   }, []);
 
-  const engine = auto ? "Auto" : `${model.name} ${model.effort}`;
+  if (stage === "booting") return <BootScreen />;
 
-  // View width cap: 70% of the workspace after the sidebar
-  const viewMax = Math.max(
-    VIEW_MIN,
-    Math.floor((window.innerWidth - (isCollapsed ? 72 : sidebarWidth)) * 0.7)
+  return stage === "signed-in" ? (
+    <SignedInApp />
+  ) : (
+    <LoginScreen bootError={bootError} onSignedIn={() => setStage("signed-in")} />
   );
+}
 
-  const handleGenerate = (promptText: string) => {
-    const text = promptText.trim();
-    if (!text) return;
-
-    setMessages((prev) => [
-      ...prev,
-      { id: Date.now(), role: "user", text, meta: `${mode} · ${engine}` },
-    ]);
-    setIsLoading(true);
-    setViewType("email"); // contextual: show the draft while it's being created
-
-    setTimeout(() => {
-      const lower = text.toLowerCase();
-      let emailResult: GeneratedEmail;
-
-      if (lower.includes("welcome") || lower.includes("onboarding")) {
-        emailResult = {
-          subject: "Welcome to Acme — Your exclusive 15% discount is inside 🎉",
-          previewText: "We're thrilled to have you. Here is everything you need to get started.",
-          headline: "Welcome to a smarter way to craft emails",
-          body: [
-            "Thank you for joining Acme AI. We built Ace Studio with one singular mission: to make every email you send thoughtful, high-converting, and impossible for your subscribers to ignore.",
-            "As a special welcome gift, use the code WELCOME15 at checkout on any plan upgrade or premium template bundle this month.",
-            "Explore your workspace, connect your custom sending domain, and start drafting your first campaign in under two minutes.",
-          ],
-          ctaText: "Claim Your 15% Discount →",
-          ctaLink: "https://acme.ai/claim-offer",
-        };
-      } else if (lower.includes("product") || lower.includes("launch") || lower.includes("ai")) {
-        emailResult = {
-          subject: "Introducing Ace Studio 2.0: Deep Reasoning for Email Marketing",
-          previewText: "Higher open rates, instant copy variations, and brand-safe email intelligence.",
-          headline: "The next generation of email creation has arrived",
-          body: [
-            "Today we are proud to release Ace Studio 2.0 — our biggest upgrade yet. Powered by advanced contextual reasoning, it understands your brand voice, predicts spam filters, and crafts layouts designed to convert.",
-            "Key updates include real-time tone tuning, multi-channel segmentation previews, and one-click export to your existing ESP.",
-            "Experience the new standard for email marketing teams worldwide.",
-          ],
-          ctaText: "Explore Ace Studio 2.0 →",
-          ctaLink: "https://acme.ai/ace-2",
-        };
-      } else if (
-        lower.includes("re-engagement") ||
-        lower.includes("inactive") ||
-        lower.includes("automate")
-      ) {
-        emailResult = {
-          subject: "We miss you! Here is $20 towards your next project",
-          previewText: "A lot has improved since your last visit. Come see what's new.",
-          headline: "It's been a while, and we've saved your spot",
-          body: [
-            "We noticed you haven't dropped by recently, and we wanted to check in. Over the last month, we've shipped over 20 new features and speed optimizations.",
-            "To welcome you back, we've credited $20 directly to your Acme account, ready to apply toward any active campaign or subscription renewal.",
-            "Take a quick peek and see how much faster your team can move.",
-          ],
-          ctaText: "Activate My $20 Credit →",
-          ctaLink: "https://acme.ai/welcome-back",
-        };
-      } else {
-        emailResult = {
-          subject: `Campaign Draft: ${text.slice(0, 45)}...`,
-          previewText: "Custom generated copy tailored to your prompt and audience.",
-          headline: "Crafted specifically for your campaign goals",
-          body: [
-            `Based on your request: "${text}", our ${engine} engine optimized this layout for clarity and customer engagement.`,
-            "Every sentence has been structured to maintain high reader retention and encourage immediate response.",
-            "Review the copy, adjust tone parameters as needed, and deploy directly to your audience segments.",
-          ],
-          ctaText: "Deploy This Campaign →",
-          ctaLink: "https://acme.ai/deploy",
-        };
-      }
-
-      setPreviousEmail(currentEmail);
-      setCurrentEmail(emailResult);
-      setIsLoading(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          role: "assistant",
-          text: `Draft ready — “${emailResult.subject}”`,
-          meta: `Ace Studio 2.0 · Deliverability 98/100 · ${engine}`,
-        },
-      ]);
-    }, 800);
-  };
-
+function BootScreen() {
   return (
-    <div
-      className={`w-screen h-screen flex overflow-hidden select-none font-sans text-[var(--text-primary)] transition-colors duration-300 ${
-        theme === "dark" ? "theme-dark" : "theme-light"
-      }`}
-    >
-      {/* Sidebar — independently resizable + collapsible */}
-      <Sidebar
-        activeItem={activeNav}
-        onSelectItem={(id) => {
-          setActiveNav(id);
-          if (id === "brand-images") setViewType("image");
-          else if (id === "history") setViewType("terminal");
-        }}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
-        onOpenNewEmailModal={() => setIsNewEmailOpen(true)}
-        onOpenTemplatesModal={() => setIsTemplatesOpen(true)}
-        onOpenBrandsModal={() => setIsBrandsOpen(true)}
-        theme={theme}
-        onSetTheme={setTheme}
-        width={sidebarWidth}
-        onWidthChange={setSidebarWidth}
-      />
-
-      {/* Primary area: Unified AI Workspace + conditional View */}
-      <div className="flex-1 h-screen flex flex-col overflow-hidden">
-        <StudioHeader
-          campaignTitle={campaignTitle}
-          onChangeTitle={setCampaignTitle}
-          onSendTest={() => alert(`Test email sent to your inbox for "${currentEmail.subject}"!`)}
-          onDeploy={() => setIsPreviewOpen(true)}
-          viewType={viewType}
-          onOpenView={(t) => setViewType(t)}
-        />
-
-        <div className="flex-1 flex overflow-hidden relative">
-          {/* UnifiedAIWorkspace — conversation + generation + agent activity in ONE area */}
-          <PrimaryWorkspace
-            messages={messages}
-            isLoading={isLoading}
-            prompt={prompt}
-            onPromptChange={setPrompt}
-            onSubmit={() => handleGenerate(prompt)}
-            mode={mode}
-            onModeChange={setMode}
-            model={model}
-            onModelChange={setModel}
-            auto={auto}
-            onAutoChange={setAuto}
-            banner={banner}
-            onDismissBanner={() => setBanner(false)}
-            onSelectSuggestion={(p) => {
-              setPrompt(p);
-              handleGenerate(p);
-            }}
-            theme={theme}
-          />
-
-          {/* Conditional View — contextual visual surface, removed entirely when closed */}
-          <AnimatePresence>
-            {viewType && (
-              <ViewPanel
-                viewType={viewType}
-                onTypeChange={setViewType}
-                onClose={() => setViewType(null)}
-                width={Math.min(viewWidth, viewMax)}
-                onWidthChange={setViewWidth}
-                maxWidth={viewMax}
-                viewProps={{
-                  email: currentEmail,
-                  onEmailChange: setCurrentEmail,
-                  previousEmail,
-                  engine,
-                  isLoading,
-                }}
-              />
-            )}
-          </AnimatePresence>
-        </div>
+    <div className="flex h-screen w-screen items-center justify-center bg-surface">
+      <div className="flex flex-col items-center gap-3">
+        <span className="h-7 w-7 animate-spin rounded-full border-2 border-line-strong border-t-brand-600" />
+        <p className="text-[13px] text-ink-muted">Loading ROSA…</p>
       </div>
-
-      {/* Modals */}
-      <EmailPreviewModal
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        email={currentEmail}
-        onRegenerate={() => handleGenerate(prompt || "Generate a welcome email")}
-        isGenerating={isLoading}
-      />
-
-      <NewEmailModal
-        isOpen={isNewEmailOpen}
-        onClose={() => setIsNewEmailOpen(false)}
-        onSelectOption={(opt) => {
-          if (opt === "ai-prompt") {
-            setPrompt("Generate an engaging email campaign for ");
-          } else if (opt === "template") {
-            setIsTemplatesOpen(true);
-          }
-        }}
-      />
-
-      <TemplatesModal
-        isOpen={isTemplatesOpen}
-        onClose={() => setIsTemplatesOpen(false)}
-        onSelectTemplate={(tplPrompt) => {
-          setPrompt(tplPrompt);
-          handleGenerate(tplPrompt);
-        }}
-      />
-
-      <BrandKitModal isOpen={isBrandsOpen} onClose={() => setIsBrandsOpen(false)} />
     </div>
   );
 }
 
-export default App;
+/* ------------------------------------------------------------------ */
+/* Signed-in application                                               */
+/* ------------------------------------------------------------------ */
+
+function SignedInApp() {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  const refreshProviders = useCallback(async () => {
+    const { providers } = await listProviders();
+    dispatch({ type: "providers/set", providers });
+    return providers;
+  }, []);
+
+  const refreshModels = useCallback(async () => {
+    const { models } = await listModels();
+    dispatch({ type: "models/set", models });
+    return models;
+  }, []);
+
+  const refreshConversations = useCallback(async () => {
+    const res = await listConversations({ limit: 100 });
+    dispatch({ type: "conversations/set", conversations: res.conversations });
+    return res.conversations;
+  }, []);
+
+  const refreshAll = useCallback(async () => {
+    const [health, session, providers, models, conversations] = await Promise.all([
+      getHealth(),
+      getSession(),
+      listProviders(),
+      listModels(),
+      listConversations({ limit: 100 }),
+    ]);
+    dispatch({
+      type: "boot/ready",
+      payload: {
+        health,
+        user: session.user,
+        providers: providers.providers,
+        models: models.models,
+      },
+    });
+    dispatch({ type: "conversations/set", conversations: conversations.conversations });
+  }, []);
+
+  useEffect(() => {
+    void refreshAll().catch((err) => {
+      dispatch({
+        type: "toast/push",
+        toast: {
+          id: `load-${Date.now()}`,
+          tone: "danger",
+          message: "Could not load your workspace.",
+          detail: err instanceof Error ? err.message : String(err),
+        },
+      });
+    });
+  }, [refreshAll]);
+
+  const handleLogout = useCallback(async () => {
+    await logout().catch(() => undefined);
+    window.location.href = "/";
+  }, []);
+
+  const user: UserProfile | null = state.user;
+
+  const openConversation = useCallback(async (id: string) => {
+    const res = await getConversation(id);
+    dispatch({ type: "conversation/active", id });
+    dispatch({ type: "messages/set", messages: res.messages.map(toChatMessageView) });
+  }, []);
+
+  const startNewConversation = useCallback(async () => {
+    try {
+      const { conversation } = await createConversation({
+        paneCount: state.paneCount,
+        paneModels: state.panes.map((pane) =>
+          pane.providerId && pane.modelId
+            ? { providerId: pane.providerId, modelId: pane.modelId }
+            : null,
+        ),
+      });
+      dispatch({ type: "conversation/created", conversation });
+      dispatch({ type: "messages/set", messages: [] });
+      return conversation;
+    } catch (err) {
+      dispatch({
+        type: "toast/push",
+        toast: {
+          id: `conv-${Date.now()}`,
+          tone: "danger",
+          message: "Could not start a conversation.",
+          detail: err instanceof Error ? err.message : String(err),
+        },
+      });
+      return null;
+    }
+  }, [state.paneCount, state.panes]);
+
+  const removeConversation = useCallback(async (id: string) => {
+    await deleteConversation(id).catch(() => undefined);
+    dispatch({ type: "conversation/removed", id });
+  }, []);
+
+  /** AbortControllers keyed by pane id, so cancelling one pane is isolated. */
+  const paneControllers = useRef(new Map<number, AbortController>());
+
+  const sendToPane = useCallback(
+    async (
+      paneId: number,
+      conversationId: string | null,
+      messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+    ) => {
+      const pane = state.panes.find((p) => p.id === paneId);
+      if (!pane?.providerId || !pane.modelId) {
+        dispatch({
+          type: "toast/push",
+          toast: {
+            id: `sel-${paneId}-${Date.now()}`,
+            tone: "warning",
+            message: "A pane has no model selected.",
+          },
+        });
+        return;
+      }
+
+      const model = state.models.find(
+        (m) => m.providerId === pane.providerId && m.modelId === pane.modelId,
+      );
+      const requestId = crypto.randomUUID();
+      const controller = new AbortController();
+      paneControllers.current.set(paneId, controller);
+      deltaBuffers.delete(paneId);
+
+      dispatch({
+        type: "pane/run-start",
+        paneId,
+        requestId,
+        providerId: pane.providerId,
+        modelId: pane.modelId,
+        modelLabel: model?.displayName ?? pane.modelId,
+      });
+
+      // The context window becomes known before the first token arrives.
+      if (model?.contextWindow) {
+        dispatch({ type: "pane/context", paneId, contextWindow: model.contextWindow });
+      }
+
+      try {
+        const res = await openChatStream(
+          {
+            providerId: pane.providerId,
+            modelId: pane.modelId,
+            modelLabel: model?.displayName ?? pane.modelId,
+            messages,
+            stream: true,
+            temperature: state.temperature,
+            maxTokens: state.maxTokens,
+            conversationId,
+            requestId,
+          },
+          controller.signal,
+        );
+
+        if (!res.ok) {
+          const text = await res.text();
+          dispatch({ type: "pane/error", paneId, error: parseErrorPayload(text, res.status) });
+          return;
+        }
+
+        await readChatStream(res, {
+          onEvent: (event: StreamEvent) => applyStreamEvent(event, paneId, dispatch),
+          onNetworkError: (error: ApiErrorPayload) =>
+            dispatch({ type: "pane/error", paneId, error }),
+        });
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        dispatch({
+          type: "pane/error",
+          paneId,
+          error: {
+            code: "transport",
+            message: err instanceof Error ? err.message : String(err),
+            retryable: true,
+          },
+        });
+      } finally {
+        paneControllers.current.delete(paneId);
+      }
+    },
+    [state.panes, state.models, state.temperature, state.maxTokens],
+  );
+
+  const cancelPane = useCallback(
+    (paneId: number) => {
+      const controller = paneControllers.current.get(paneId);
+      if (controller) {
+        controller.abort();
+        paneControllers.current.delete(paneId);
+      }
+      const pane = state.panes.find((p) => p.id === paneId);
+      if (pane?.requestId) void cancelRun(pane.requestId);
+    },
+    [state.panes],
+  );
+
+  const handleSend = useCallback(
+    async (convId: string, text: string) => {
+      let conversationId: string | null = convId ?? state.activeConversationId;
+      if (!conversationId) {
+        const created = await startNewConversation();
+        conversationId = created?.id ?? null;
+      }
+      if (!conversationId) return;
+
+      const history = state.messages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+      const systemPrefix = state.systemPrompt.trim()
+        ? [{ role: "system" as const, content: state.systemPrompt.trim() }]
+        : [];
+
+      const targetPanes =
+        state.mode === "compare" ? state.panes : [state.panes[0] ?? makePane(1)];
+
+      for (const pane of targetPanes) {
+        if (!pane.providerId || !pane.modelId) continue;
+        await sendToPane(
+          pane.id,
+          conversationId,
+          [...systemPrefix, ...history, { role: "user", content: text }],
+        );
+      }
+
+      dispatch({
+        type: "messages/append",
+        message: {
+          clientId: `local-${Date.now()}`,
+          id: "",
+          conversationId,
+          role: "user",
+          content: text,
+          providerId: null,
+          modelId: null,
+          modelLabel: null,
+          status: "completed",
+          metrics: null,
+          error: null,
+          parentMessageId: null,
+          paneIndex: null,
+          createdAt: Date.now(),
+        },
+      });
+    },
+    [
+      state.activeConversationId,
+      state.messages,
+      state.systemPrompt,
+      state.mode,
+      state.panes,
+      sendToPane,
+      startNewConversation,
+    ],
+  );
+
+  return (
+    <AppShell
+      state={state}
+      dispatch={dispatch}
+      user={user}
+      sidebar={
+        <Sidebar
+          state={state}
+          dispatch={dispatch}
+          onOpenConversation={openConversation}
+          onNewConversation={startNewConversation}
+          onDeleteConversation={removeConversation}
+          onLogout={handleLogout}
+          onRefreshModels={refreshModels}
+          onRefreshConversations={refreshConversations}
+        />
+      }
+    >
+      <Workspace
+        state={state}
+        dispatch={dispatch}
+        onSend={handleSend}
+        onCancelPane={cancelPane}
+        onOpenConversation={openConversation}
+        onNewConversation={startNewConversation}
+        onRefreshModels={refreshModels}
+        onRefreshProviders={refreshProviders}
+      />
+    </AppShell>
+  );
+}
+
+function makePane(id: number): PaneState {
+  return {
+    id,
+    providerId: null,
+    modelId: null,
+    modelLabel: "",
+    requestId: null,
+    content: "",
+    status: "idle",
+    error: null,
+    metrics: null,
+    contextWindow: null,
+    submittedMessageId: null,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The reducer cannot read `pane.content` while updating it, so delta text is
+ * accumulated in a buffer keyed by pane id. This keeps the reducer pure while
+ * still producing one complete string per frame.
+ */
+const deltaBuffers = new Map<number, string>();
+
+function applyStreamEvent(
+  event: StreamEvent,
+  paneId: number,
+  dispatch: React.Dispatch<Action>,
+): void {
+  switch (event.type) {
+    case "start":
+      deltaBuffers.set(paneId, "");
+      dispatch({ type: "pane/active", paneId });
+      break;
+    case "delta":
+      deltaBuffers.set(paneId, (deltaBuffers.get(paneId) ?? "") + event.text);
+      dispatch({ type: "pane/delta", paneId, text: deltaBuffers.get(paneId) ?? "" });
+      break;
+    case "usage":
+      dispatch({
+        type: "pane/usage",
+        paneId,
+        metrics: {
+          inputTokens: event.inputTokens,
+          outputTokens: event.outputTokens,
+          inputTokensEstimated: event.estimated,
+          outputTokensEstimated: event.estimated,
+        },
+      });
+      break;
+    case "context":
+      dispatch({
+        type: "pane/context",
+        paneId,
+        // The provider may report no context window at all. `null` is passed
+        // through so the UI can say "unknown" rather than assume zero.
+        contextWindow: event.contextWindow ?? null,
+      });
+      break;
+    case "done":
+      dispatch({
+        type: "pane/done",
+        paneId,
+        metrics: event.metrics as PaneMetrics,
+        finishReason: event.finishReason ?? null,
+      });
+      break;
+    case "error":
+      dispatch({ type: "pane/error", paneId, error: event.error });
+      break;
+    default:
+      break;
+  }
+}
+
+function parseErrorPayload(text: string, status: number): ApiErrorPayload {
+  try {
+    const parsed = JSON.parse(text) as { error?: ApiErrorPayload };
+    if (parsed?.error) return parsed.error;
+  } catch {
+    /* fall through */
+  }
+  return {
+    code: "internal",
+    message: `The request failed with status ${status}.`,
+    retryable: status >= 500,
+  };
+}
+
+function toChatMessageView(message: {
+  id: string;
+  conversationId: string;
+  role: "system" | "user" | "assistant";
+  content: string;
+  providerId: string | null;
+  modelId: string | null;
+  modelLabel: string | null;
+  status: string | null;
+  metrics: unknown;
+  error: unknown;
+  parentMessageId: string | null;
+  paneIndex: number | null;
+  createdAt: number;
+}): ChatMessageView {
+  return {
+    clientId: `srv-${message.id}`,
+    id: message.id,
+    conversationId: message.conversationId,
+    role: message.role,
+    content: message.content,
+    providerId: message.providerId,
+    modelId: message.modelId,
+    modelLabel: message.modelLabel,
+    status: (message.status ?? null) as ChatMessageView["status"],
+    metrics: (message.metrics ?? null) as ChatMessageView["metrics"],
+    error: (message.error ?? null) as ChatMessageView["error"],
+    parentMessageId: message.parentMessageId,
+    paneIndex: message.paneIndex,
+    createdAt: message.createdAt,
+  };
+}

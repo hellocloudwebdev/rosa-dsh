@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rosa",
+  "main": "server/worker.ts",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "rosa_db",
+      "database_name": "rosa-db",
+      "database_id": "31cc5a04-9f11-4a60-a960-2b71acba6d56",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "NODE_ENV": "production",
+    "CLERK_PUBLISHABLE_KEY": "pk_test_bmV1dHJhbC1zbmlwZS04NjQ2LmNsZXJrLmFjY291bnRzLmRldiQ"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.server.tsbuildinfo",
+    "types": ["node"],
+    "lib": ["ES2023"],
+    "outDir": "dist-server",
+    "rootDir": ".",
+    "declaration": true,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "sourceMap": false
+  },
+  "include": ["server/**/*.ts", "shared/**/*.ts"]
+}
