@@ -16,7 +16,7 @@ export interface SqlStatement<Row = Record<string, unknown>> {
 }
 
 export interface SqlDriver {
-  readonly name: "sqlite" | "d1" | "http";
+  readonly name: "sqlite" | "d1" | "d1-rest" | "http";
   prepare: <Row = Record<string, unknown>>(sql: string) => SqlStatement<Row>;
   /** Run several statements in one transaction when the backend supports it. */
   batch: (statements: SqlStatement[]) => Promise<unknown[]>;

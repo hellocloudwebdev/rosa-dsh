@@ -11,9 +11,9 @@ import { normaliseModel } from "../shared/models.js";
 import { AppDatabase } from "./db/repository.js";
 import { getAdapter, type ProviderAdapter } from "./adapters/index.js";
 import type { AdapterContext, ChatOptions } from "./adapters/base.js";
-import { providerFetch } from "./http.js";
-import { presetFor } from "../shared/providers.js";
-import { validateProviderBaseUrl } from "../shared/urlGuard.js";
+import { providerFetch, readCappedText } from "./http.js";
+import { presetFor, redactSecrets } from "../shared/providers.js";
+import { validateProviderBaseUrl, type Lookup } from "../shared/urlGuard.js";
 import { ChatRun } from "./chatRun.js";
 import {
   apiError,
@@ -27,6 +27,7 @@ import {
 import {
   authenticate,
   buildAuthorizeUrl,
+  createPkcePair,
   createSessionToken,
   oauthDescriptors,
   getOAuthProvider,
@@ -35,6 +36,7 @@ import {
 } from "./auth.js";
 import {
   OAUTH_STATE_COOKIE,
+  SECURITY_HEADERS,
   SESSION_COOKIE,
   clearCookieHeader,
   cookieHeader,
@@ -51,13 +53,54 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 export interface ApiDeps {
   app: AppDatabase;
   env: ApiEnv;
-  /** Used only to make the health response meaningful. */
-  startedAt: number;
+  /**
+   * DNS resolver used to reject provider hosts that resolve to private
+   * addresses.
+   *
+   * Injected rather than imported so this module never pulls `node:dns` into the
+   * Cloudflare Worker bundle. Node entry points pass `nodeLookup`; the Worker
+   * leaves it undefined and relies on the platform, which blocks private-IP
+   * subrequests at the network layer.
+   */
+  lookup?: Lookup;
+  /**
+   * Allow provider requests to loopback. Set only by the local dev server so it
+   * can talk to Ollama / LM Studio / vLLM. Must stay unset in any deployment.
+   */
+  allowLocalhost?: boolean;
 }
 
 interface ActiveRun {
   run: ChatRun;
   providerLabel: string;
+  /**
+   * Owner of the run. Cancellation must be scoped to it: `activeRuns` is
+   * module-global and the request id arrives from the client, so without this
+   * check any caller who learned another user's id could abort their stream.
+   */
+  userId: string;
+}
+
+/**
+ * Build the adapter context every provider call goes through.
+ *
+ * Centralised so the SSRF controls (`lookup`, `allowLocalhost`) cannot be
+ * omitted from one call site by accident — leaving them off silently downgrades
+ * that path to literal-IP-only checking.
+ */
+function adapterContext(
+  deps: ApiDeps,
+  row: { base_url: string; organization_id: string | null; display_name: string },
+  apiKey: string,
+): AdapterContext {
+  return {
+    baseUrl: row.base_url,
+    apiKey,
+    organizationId: row.organization_id,
+    providerLabel: row.display_name,
+    lookup: deps.lookup,
+    allowLocalhost: deps.allowLocalhost === true,
+  };
 }
 
 /**
@@ -100,17 +143,41 @@ async function dispatch(
   // -------- public --------
   if (req.method === "GET" && m(/^\/health$/)) {
     const providers = oauthDescriptors(deps.env);
+    /**
+     * Unauthenticated, so it reports only what the sign-in screen needs.
+     *
+     * The provider ids have to stay: the login screen renders one button per
+     * configured provider, and this is the only endpoint it can reach before
+     * signing in. They are not secrets — an OAuth client id is public and the
+     * ids are the two documented options.
+     *
+     * What was removed is the gratuitous part: the application version, the
+     * database driver kind and process uptime. Nothing consumed them, and
+     * together they fingerprint the deployment and its patch level.
+     */
+    const authList = providers.map((p) => p.id);
+    if (deps.allowLocalhost) {
+      authList.push("local");
+    }
     return json({
       ok: true,
-      version: "1.0.0",
-      auth: providers.map((p) => p.id),
-      oauthConfigured: providers.length > 0,
+      /** Only providers with credentials configured appear here. */
+      auth: authList,
+      oauthConfigured: authList.length > 0,
+      /**
+       * Whether the server can actually persist provider keys.
+       * "session-only" means no ROSA_ENCRYPTION_KEY was supplied, in which case
+       * a provider key can be used for the current session but not stored.
+       */
       keyStorage: deps.app.canStoreKeys ? "encrypted-server-side" : "session-only",
     });
   }
 
   const authStart = m(/^\/auth\/([a-z0-9_-]+)\/start$/);
-  if (req.method === "POST" && authStart) {
+  if (
+    authStart &&
+    (req.method === "POST" || (req.method === "GET" && deps.allowLocalhost && authStart[1] === "local"))
+  ) {
     return handleOAuthStart(req, deps, authStart[1], url);
   }
 
@@ -185,11 +252,28 @@ async function dispatch(
 
   const testMatch = m(/^\/providers\/([^/]+)\/test$/);
   if (req.method === "POST" && testMatch) {
+    // These endpoints make an outbound request to a user-supplied host, so they
+    // are the SSRF surface. Unlimited, they are also a free way to port-scan
+    // from the deployment's IP, so they get a tighter budget than chat.
+    if (!(await deps.app.rateLimit("provider-probe", subject, 30, 60_000))) {
+      return errorFromCode(
+        "rate-limited",
+        "Too many connection tests. Wait a minute and try again.",
+        429,
+      );
+    }
     return handleTestProvider(req, deps, auth.userId, decodeURIComponent(testMatch[1]));
   }
 
   const discoverMatch = m(/^\/providers\/([^/]+)\/models$/);
   if (req.method === "POST" && discoverMatch) {
+    if (!(await deps.app.rateLimit("provider-probe", subject, 30, 60_000))) {
+      return errorFromCode(
+        "rate-limited",
+        "Too many model-discovery requests. Wait a minute and try again.",
+        429,
+      );
+    }
     return handleDiscoverModels(req, deps, auth.userId, decodeURIComponent(discoverMatch[1]));
   }
 
@@ -233,6 +317,13 @@ async function dispatch(
     if (!id) return errorFromCode("bad-request", "requestId is required.", 400);
     const active = activeRuns.get(id);
     if (!active) return json({ ok: true, cancelled: false });
+    // `activeRuns` is shared across users on this instance and the id comes from
+    // the client, so ownership must be checked before cancelling. Report it as
+    // "not found" rather than "forbidden" so this cannot be used to probe which
+    // request ids exist.
+    if (active.userId !== auth.userId) {
+      return json({ ok: true, cancelled: false });
+    }
     active.run.cancel();
     return json({ ok: true, cancelled: true });
   }
@@ -252,7 +343,20 @@ async function dispatch(
       query,
       folderId,
     });
-    return json(res);
+    // Frontend contract: { conversations, total, hasMore }. Attach per-
+    // conversation message counts and the last activity timestamp so the
+    // sidebar can show them without a second round trip.
+    const items = res.items ?? [];
+    const counts = await deps.app.countMessagesByConversation(
+      items.map((c) => c.id),
+    );
+    const conversations = items.map((c) => ({
+      ...c,
+      messageCount: counts.get(c.id) ?? 0,
+      lastMessageAt: null,
+    }));
+    const hasMore = offset + items.length < res.total;
+    return json({ conversations, total: res.total, hasMore });
   }
 
   if (req.method === "POST" && m(/^\/conversations$/)) {
@@ -378,6 +482,8 @@ async function probeChatEndpoint(adapter: ProviderAdapter, ctx: AdapterContext):
     headers: { "content-type": "application/json", ...a.chatHeaders(ctx, "__probe__") },
     body: JSON.stringify({ messages: [{ role: "user", content: " " }] }),
     timeoutMs: 20_000,
+    lookup: ctx.lookup,
+    allowLocalhost: ctx.allowLocalhost,
   });
 }
 
@@ -485,12 +591,7 @@ async function handleTestProvider(
   }
 
   const preset = presetFor(row.kind as never);
-  const ctx: AdapterContext = {
-    baseUrl: row.base_url,
-    apiKey,
-    organizationId: row.organization_id,
-    providerLabel: row.display_name,
-  };
+  const ctx = adapterContext(deps, row, apiKey);
 
   const adapter = getAdapter(row.kind as ProviderKind);
 
@@ -501,7 +602,10 @@ async function handleTestProvider(
         method: "GET",
         headers: adapter.listModelsHeaders(ctx),
         timeoutMs: 20_000,
+        lookup: ctx.lookup,
+        allowLocalhost: ctx.allowLocalhost,
       });
+      // `res.text()` enforces a byte cap internally; see server/http.ts.
       const raw = await res.text();
       let parsed: { data?: unknown[]; models?: unknown[] };
       try {
@@ -533,7 +637,7 @@ async function handleTestProvider(
       await probeChatEndpoint(adapter, ctx);
     } catch (probeErr) {
       const { toApiError } = await import("./http.js");
-      const payload = toApiError(probeErr, row.display_name);
+      const payload = toApiError(probeErr, row.display_name, [apiKey]);
       // A 404/401 from the chat path still means the host is reachable.
       if (payload.code !== "not-found" && payload.code !== "unauthorized") {
         throw probeErr;
@@ -550,7 +654,7 @@ async function handleTestProvider(
     });
   } catch (err) {
     const { toApiError } = await import("./http.js");
-    const payload = toApiError(err, row.display_name);
+    const payload = toApiError(err, row.display_name, [apiKey]);
     await deps.app.setProviderConnection(userId, providerId, {
       connectionStatus: "error",
       connectionError: payload.message,
@@ -588,12 +692,7 @@ async function handleDiscoverModels(
     );
   }
 
-  const ctx: AdapterContext = {
-    baseUrl: row.base_url,
-    apiKey,
-    organizationId: row.organization_id,
-    providerLabel: row.display_name,
-  };
+  const ctx = adapterContext(deps, row, apiKey);
   const adapter = getAdapter(row.kind as ProviderKind);
 
   try {
@@ -603,7 +702,10 @@ async function handleDiscoverModels(
       method: "GET",
       headers: adapter.listModelsHeaders(ctx),
       timeoutMs: 30_000,
+      lookup: ctx.lookup,
+      allowLocalhost: ctx.allowLocalhost,
     });
+    // `res.text()` enforces a byte cap internally; see server/http.ts.
     const raw = await res.text();
     let payload: unknown;
     try {
@@ -641,7 +743,7 @@ async function handleDiscoverModels(
     });
   } catch (err) {
     const { toApiError } = await import("./http.js");
-    const payload = toApiError(err, row.display_name);
+    const payload = toApiError(err, row.display_name, [apiKey]);
     await deps.app.setProviderConnection(userId, providerId, {
       connectionStatus: "error",
       connectionError: payload.message,
@@ -715,16 +817,11 @@ async function handleChat(
   );
 
   const run = new ChatRun(requestId, row.display_name);
-  activeRuns.set(requestId, { run, providerLabel: row.display_name });
+  activeRuns.set(requestId, { run, providerLabel: row.display_name, userId });
   const cleanup = () => activeRuns.delete(requestId);
 
   const adapter = getAdapter(row.kind as ProviderKind);
-  const ctx: AdapterContext = {
-    baseUrl: row.base_url,
-    apiKey,
-    organizationId: row.organization_id,
-    providerLabel: row.display_name,
-  };
+  const ctx = adapterContext(deps, row, apiKey);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -818,7 +915,7 @@ async function handleChat(
         }
       } catch (err) {
         const { toApiError } = await import("./http.js");
-        const payload = toApiError(err, row.display_name);
+        const payload = toApiError(err, row.display_name, [apiKey]);
         send({ type: "error", error: payload });
         if (assistantMessageId) {
           await deps.app.updateMessage(assistantMessageId, {
@@ -854,12 +951,14 @@ async function handleChat(
   });
 }
 
+/**
+ * Security headers for responses not built by `json()`.
+ *
+ * Reads the same table `json()`/`apiError()` use, so SSE streams and OAuth
+ * redirects cannot drift to a weaker policy than ordinary JSON responses.
+ */
 function securityHeaderObject(): Record<string, string> {
-  return {
-    "x-content-type-options": "nosniff",
-    "x-frame-options": "DENY",
-    "referrer-policy": "strict-origin-when-cross-origin",
-  };
+  return { ...SECURITY_HEADERS };
 }
 
 /* ------------------------------------------------------------------ */
@@ -872,22 +971,60 @@ async function handleOAuthStart(
   providerId: string,
   url: URL,
 ): Promise<Response> {
+  if (providerId === "local") {
+    if (!deps.allowLocalhost) {
+      return errorFromCode("forbidden", "Local sign-in is disabled in production.", 403);
+    }
+    const user = await deps.app.upsertOAuthUser({
+      provider: "local",
+      providerAccountId: "local-user",
+      email: "local@localhost",
+      name: "Local User",
+      avatarUrl: null,
+    });
+    const { token, tokenHash } = await createSessionToken();
+    await deps.app.createSession({
+      tokenHash,
+      userId: user.id,
+      ttlMs: SESSION_TTL_MS,
+      userAgent: req.headers.get("user-agent") ?? "local-browser",
+      ip: "127.0.0.1",
+    });
+    const appUrl = deps.env.ROSA_PUBLIC_APP_URL ?? url.origin;
+    const cookie = cookieHeader(
+      SESSION_COOKIE,
+      encodeURIComponent(token),
+      sessionCookieOptions(deps.env, SESSION_TTL_MS),
+    );
+    const headers = new Headers({
+      location: `${appUrl}/app`,
+      "set-cookie": cookie,
+    });
+    for (const [k, v] of Object.entries(securityHeaderObject())) headers.set(k, v);
+    return new Response(null, { status: 302, headers });
+  }
+
   const provider = getOAuthProvider(deps.env, providerId);
   if (!provider) {
     return errorFromCode("bad-request", `OAuth provider "${providerId}" is not configured.`, 400);
   }
 
-  const ip = clientIp(req);
-  const allowed = await deps.app.rateLimit("oauth-start", ip, 20, 300_000);
+  // Keyed via rateLimitSubject so an unauthenticated caller cannot bypass the
+  // limit by rotating a spoofed forwarded-for header.
+  const allowed = await deps.app.rateLimit("oauth-start", rateLimitSubject(req), 20, 300_000);
   if (!allowed) {
     return errorFromCode("rate-limited", "Too many sign-in attempts. Wait a minute.", 429);
   }
 
   const state = await randomToken(24);
+  // PKCE: the challenge travels to the provider, the verifier stays in our
+  // database until the callback. See createPkcePair for why S256 rather than
+  // "plain".
+  const pkce = await createPkcePair();
   await deps.app.saveOAuthState({
     state,
     provider: providerId,
-    codeVerifier: null,
+    codeVerifier: pkce.verifier,
     redirectTo: null,
     ttlMs: 10 * 60 * 1000,
   });
@@ -899,6 +1036,7 @@ async function handleOAuthStart(
   const authorizeUrl = buildAuthorizeUrl(provider, {
     redirectUri,
     state,
+    codeChallenge: pkce.challenge,
   });
 
   const headers = new Headers({ location: authorizeUrl });
@@ -957,19 +1095,26 @@ async function handleOAuthCallback(
   // Exchange the code for an access token.
   let accessToken: string;
   try {
+    const tokenBody = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+      client_id: provider.clientId,
+      client_secret: provider.clientSecret,
+    });
+    // Only sent when we issued one, so a state record created before PKCE was
+    // wired up still completes rather than failing the exchange.
+    if (consumed.codeVerifier) {
+      tokenBody.set("code_verifier", consumed.codeVerifier);
+    }
+
     const tokenRes = await fetch(provider.tokenUrl, {
       method: "POST",
       headers: {
         "content-type": "application/x-www-form-urlencoded",
         accept: "application/json",
       },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirectUri,
-        client_id: provider.clientId,
-        client_secret: provider.clientSecret,
-      }),
+      body: tokenBody,
     });
     const tokenJson = (await tokenRes.json()) as {
       access_token?: string;
@@ -1082,8 +1227,6 @@ function isKnownKind(kind: string): boolean {
 async function randomToken(bytes: number): Promise<string> {
   const arr = new Uint8Array(bytes);
   crypto.getRandomValues(arr);
-  let s = "";
-  for (const b of arr) s += String.fromCharCode(b);
   return base64url(arr);
 }
 
@@ -1141,22 +1284,49 @@ function statusForCode(code: string): number {
   }
 }
 
-/** Never echo raw text into a redirect URL. */
+/**
+ * Make arbitrary text safe to place in a redirect URL.
+ *
+ * Applied to the `error=` query parameter the login screen renders, so this is a
+ * reflected-text path. React escapes it on render, but encoding here means the
+ * value also survives any other consumer (a log line, a proxy) without injecting
+ * separators, and credential-shaped text never reaches the address bar or
+ * browser history.
+ */
 function sanitize(text: string): string {
-  return text.replace(/[\r\n]+/g, " ").slice(0, 200);
+  return redactSecrets(text).replace(/[\r\n\t]+/g, " ").slice(0, 200);
 }
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-/** Parse a JSON body with a size cap, or null when it is not usable JSON. */
+/**
+ * Parse a JSON body, refusing anything over `maxBytes`.
+ *
+ * The cap is enforced while reading, not after: `await req.text()` would buffer
+ * the entire body first, so a "cap" applied to the result is not a cap at all.
+ * The size is measured in bytes rather than UTF-16 code units, so a body of
+ * multi-byte characters cannot pass by counting fewer characters than the bytes
+ * it actually occupies.
+ */
 async function readJson<T>(req: Request, maxBytes = 64 * 1024): Promise<T | null> {
   const contentType = req.headers.get("content-type") ?? "";
   if (!contentType.includes("json")) return null;
+
+  // A declared length is honoured when present, as a cheap early rejection.
+  const declared = Number(req.headers.get("content-length") ?? Number.NaN);
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+
+  if (!req.body) return null;
+  let text: string;
   try {
-    const text = await req.text();
-    if (text.length > maxBytes) return null;
+    text = await readCappedText(req.body, maxBytes);
+  } catch {
+    return null;
+  }
+
+  try {
     return JSON.parse(text) as T;
   } catch {
     return null;

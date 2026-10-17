@@ -6,6 +6,7 @@ import type {
 import type { RawModel } from "../../shared/models.js";
 import { normaliseModel } from "../../shared/models.js";
 import { SSEParser } from "../../shared/sse.js";
+import type { Lookup } from "../../shared/urlGuard.js";
 
 export interface AdapterContext {
   /** Absolute base URL, already validated. */
@@ -16,6 +17,20 @@ export interface AdapterContext {
   providerLabel: string;
   /** Extra request settings the user configured for this provider. */
   settings?: Record<string, string>;
+  /**
+   * DNS resolver used to confirm the provider host is public.
+   *
+   * Injected rather than imported so `shared/` and the adapters stay usable on
+   * Cloudflare Workers, which has no `node:dns`. When absent, only literal-IP
+   * addresses are checked and a hostname is trusted on its name — which is why
+   * every Node-side caller supplies one.
+   */
+  lookup?: Lookup;
+  /**
+   * Permit requests to loopback. Local development only, for Ollama / LM Studio
+   * / vLLM. Never set this in a deployed environment.
+   */
+  allowLocalhost?: boolean;
 }
 
 export interface ChatTurn {
@@ -106,6 +121,8 @@ export abstract class BaseAdapter implements ProviderAdapter {
       body: JSON.stringify(this.buildBody(ctx, { ...opts, stream: true })),
       timeoutMs: opts.timeoutMs,
       signal: opts.signal,
+      lookup: ctx.lookup,
+      allowLocalhost: ctx.allowLocalhost,
     });
 
     if (!res.body) {
@@ -165,6 +182,8 @@ export abstract class BaseAdapter implements ProviderAdapter {
       body: JSON.stringify(this.buildBody(ctx, { ...opts, stream: false })),
       timeoutMs: opts.timeoutMs,
       signal: opts.signal,
+      lookup: ctx.lookup,
+      allowLocalhost: ctx.allowLocalhost,
     });
     const payload = await res.json<Record<string, unknown>>();
     const { text, usage } = this.parseCompletion(payload);

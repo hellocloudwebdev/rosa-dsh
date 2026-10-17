@@ -1,4 +1,6 @@
 import { DatabaseSync, type StatementSync } from "node:sqlite";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import type { SqlDriver, SqlStatement } from "./driver.js";
 import { MIGRATIONS } from "./schema.js";
 
@@ -45,6 +47,10 @@ export class SqliteDriver implements SqlDriver {
   private readonly db: DatabaseSync;
 
   constructor(filename: string, opts: { enableForeignKey?: boolean } = {}) {
+    // node:sqlite refuses to create the file if the parent directory is
+    // missing, which broke every boot with a nested ROSA_DB_PATH on a fresh
+    // checkout. Create it instead of failing.
+    mkdirSync(dirname(filename), { recursive: true });
     this.db = new DatabaseSync(filename);
     if (opts.enableForeignKey !== false) {
       this.db.exec("PRAGMA foreign_keys = ON;");

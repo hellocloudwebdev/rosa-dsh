@@ -109,6 +109,8 @@ export class ChatRun {
         body: JSON.stringify(call.buildBody(ctx, options)),
         timeoutMs: opts.timeoutMs,
         signal: this.signal,
+        lookup: ctx.lookup,
+        allowLocalhost: ctx.allowLocalhost,
       });
       body = res.body;
     } catch (err) {
@@ -116,7 +118,7 @@ export class ChatRun {
         this.emitCancelled(emit);
         return;
       }
-      this.errored = toApiError(err, this.providerLabel);
+      this.errored = this.apiError(err, ctx);
       emit({ type: "error", error: this.errored });
       return;
     }
@@ -149,7 +151,7 @@ export class ChatRun {
         this.emitCancelled(emit);
         return;
       }
-      this.errored = toApiError(err, this.providerLabel);
+      this.errored = this.apiError(err, ctx);
       emit({ type: "error", error: this.errored });
       return;
     }
@@ -179,6 +181,18 @@ export class ChatRun {
     emit({ type: "done", finishReason: "cancelled", metrics: this.metrics() });
   }
 
+  /**
+   * Build an error payload with the live credential redacted.
+   *
+   * Providers sometimes echo the request (including the Authorization header)
+   * back in an error body. Pattern matching would miss a short or unusual key,
+   * so the exact value is stripped too — and this detail is also what gets
+   * persisted to the message's `error` column.
+   */
+  private apiError(err: unknown, ctx: AdapterContext): ApiErrorPayload {
+    return toApiError(err, this.providerLabel, [ctx.apiKey]);
+  }
+
   private async runNonStreaming(args: RunArgs, options: ChatOptions): Promise<void> {
     const { adapter, ctx, opts } = args;
     try {
@@ -195,7 +209,7 @@ export class ChatRun {
       if (this.sawAnyDelta) this.applyMetricsToEmit(opts);
     } catch (err) {
       if (isCancellation(err) || this.cancelled) return;
-      this.errored = toApiError(err, this.providerLabel);
+      this.errored = this.apiError(err, ctx);
     }
   }
 

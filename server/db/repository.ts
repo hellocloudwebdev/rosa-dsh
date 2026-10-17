@@ -24,9 +24,15 @@ export class AppDatabase {
     return this.db;
   }
 
-  /** True when we can actually persist provider keys. */
+  /**
+   * True when we can actually persist provider keys.
+   *
+   * The 32-byte floor matches the AES-256 key the value is used to derive: a
+   * shorter `ROSA_ENCRYPTION_KEY` still "works", so accepting it would silently
+   * weaken every stored credential instead of failing loudly at startup.
+   */
   get canStoreKeys(): boolean {
-    return typeof this.masterKey === "string" && this.masterKey.length >= 16;
+    return typeof this.masterKey === "string" && this.masterKey.length >= 32;
   }
 
   /* ---------------------------------------------------------------- */
@@ -736,6 +742,19 @@ export class AppDatabase {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  /** Message counts for a set of conversations, keyed by conversation id. */
+  async countMessagesByConversation(ids: string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    for (const id of ids) {
+      const row = await this.db
+        .prepare<{ n: number }>("SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ?")
+        .bind(id)
+        .first();
+      out.set(id, Number(row?.n ?? 0));
+    }
+    return out;
   }
 
   /* ---------------------------------------------------------------- */

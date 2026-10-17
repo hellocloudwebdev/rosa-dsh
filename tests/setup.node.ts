@@ -7,9 +7,9 @@ if (!globalThis.crypto) {
 }
 
 if (typeof globalThis.structuredClone !== "function") {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (globalThis as any).structuredClone = (value: unknown) =>
-    JSON.parse(JSON.stringify(value));
+  (globalThis as { structuredClone?: (v: unknown) => unknown }).structuredClone = (
+    value: unknown,
+  ) => JSON.parse(JSON.stringify(value));
 }
 
 // jsdom-only setup file.

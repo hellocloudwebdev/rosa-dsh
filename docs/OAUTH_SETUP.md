@@ -17,14 +17,16 @@ sign-in screen shows this message instead of a button that would go nowhere:
    are configured.
 2. Clicking a provider does a real form `POST` to
    `/api/auth/<provider>/start`.
-3. The server mints a random 256-bit `state`, stores it in a short-lived
+3. The server mints a random 256-bit `state` and generates a PKCE verifier + S256
+   challenge pair. It stores `state` and the verifier in the database, sets a short-lived
    `rosa_oauth_state` cookie (`HttpOnly`, `SameSite=Lax`, `Secure` in
-   production) and redirects to the provider.
+   production), and redirects to the provider with `state`, `code_challenge` and
+   `code_challenge_method=S256`.
 4. The provider redirects back to
    `{ROSA_PUBLIC_APP_URL}/api/auth/<provider>/callback`.
-5. The server compares the returned `state` with the cookie, **consumes it so
-   it can never be replayed**, exchanges the `code` for an access token, reads
-   the profile, upserts the user and sets the `rosa_session` cookie.
+5. The server compares the returned `state` with the cookie, **consumes it along with
+   the PKCE verifier so it can never be replayed**, exchanges the `code` and `code_verifier`
+   for an access token, reads the profile, upserts the user and sets the `rosa_session` cookie.
 6. The browser lands on `{ROSA_PUBLIC_APP_URL}/app`.
 
 If anything fails, the user is redirected to

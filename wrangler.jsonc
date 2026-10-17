@@ -18,8 +18,14 @@
       "migrations_dir": "migrations"
     }
   ],
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  },
   "vars": {
     "NODE_ENV": "production",
-    "CLERK_PUBLISHABLE_KEY": "pk_test_bmV1dHJhbC1zbmlwZS04NjQ2LmNsZXJrLmFjY291bnRzLmRldiQ"
+    "CLERK_DOMAIN": "neutral-snipe-8646.clerk.accounts.dev"
   }
 }

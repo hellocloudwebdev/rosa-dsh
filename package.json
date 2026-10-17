@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Rosa — a BYOK multi-model AI chat and comparison workspace.",
   "scripts": {
+    "start": "node scripts/dev-api.mjs",
     "dev": "vite",
     "dev:api": "node scripts/dev-api.mjs",
     "build": "tsc -b && vite build",
@@ -26,8 +27,6 @@
     "supabase:push": "supabase db push"
   },
   "dependencies": {
-    "@clerk/backend": "^3.23.2",
-    "@clerk/clerk-react": "^5.61.10",
     "@clerk/react": "^6.17.8",
     "@neondatabase/serverless": "^1.0.1",
     "@radix-ui/react-dialog": "^1.1.6",
@@ -36,7 +35,10 @@
     "@radix-ui/react-select": "^2.1.6",
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
+    "@supabase/supabase-js": "^2.118.0",
     "clsx": "^2.1.1",
+    "firebase": "^13.0.0",
+    "framer-motion": "^14.3.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.22",
     "lucide-react": "^0.475.0",
@@ -58,6 +60,7 @@
     "@types/node": "^22.13.4",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
+    "@vercel/node": "^24.0.2",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^3.0.5",
     "autoprefixer": "^10.4.20",

@@ -2,20 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!--
-      ROSA ships no external font requests and no inline hardcoded palette.
-      The theme is applied by src/main.tsx from localStorage before first paint
-      so there is no flash of the wrong theme.
-    -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
-    <meta
-      name="description"
-      content="ROSA — chat with and compare up to four AI models side by side, using your own API keys."
-    />
-    <title>ROSA — AI chat and model comparison</title>
+    <title>Acme AI — Ace Studio 2.0</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
-  <body>
+  <body class="bg-[#272e28] text-neutral-100 antialiased selection:bg-white selection:text-neutral-900 overflow-hidden w-full h-full">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

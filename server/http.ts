@@ -1,4 +1,8 @@
-import { validateProviderBaseUrl } from "../shared/urlGuard.js";
+import {
+  assertPublicHost,
+  validateProviderBaseUrl,
+  type Lookup,
+} from "../shared/urlGuard.js";
 import { redactSecrets, transportError, upstreamError } from "../shared/providers.js";
 import type { ApiErrorPayload } from "../shared/types.js";
 
@@ -10,17 +14,6 @@ export const MAX_UPSTREAM_TIMEOUT_MS = 300_000; // 5 minutes
 export const MIN_UPSTREAM_TIMEOUT_MS = 5_000;
 /** Cap on a model-listing response body. */
 export const MAX_LISTING_BYTES = 2_000_000;
-
-export interface ProviderRequest {
-  /** Absolute URL already validated by the caller. */
-  url: string;
-  method: "GET" | "POST";
-  headers: Record<string, string>;
-  body?: string;
-  /** Total timeout including connection. */
-  timeoutMs: number;
-  signal?: AbortSignal;
-}
 
 export interface ProviderResponse {
   status: number;
@@ -44,9 +37,96 @@ export class ProviderHttpError extends Error {
   }
 }
 
+export interface ProviderRequest {
+  /** Absolute URL already validated by the caller. */
+  url: string;
+  method: "GET" | "POST";
+  headers: Record<string, string>;
+  body?: string;
+  /** Total timeout including connection. */
+  timeoutMs: number;
+  signal?: AbortSignal;
+  /**
+   * DNS resolver used to confirm the host is public. Injected by the caller so
+   * `shared/` stays runtime-agnostic (Workers has no `node:dns`).
+   */
+  lookup?: Lookup;
+  /**
+   * Permit loopback, for local dev against Ollama / LM Studio / vLLM only.
+   * Defaults to false; the local server opts in explicitly.
+   */
+  allowLocalhost?: boolean;
+}
+
+/**
+ * Parse a URL string and confirm it is an https provider endpoint whose host is
+ * public.
+ *
+ * This replaces a raw `startsWith("https://")` gate, which accepted anything
+ * with the right prefix — including `https://evil.example` and, worse, told us
+ * nothing about where the host actually resolved. The scheme is now derived from
+ * the parsed URL and the host is validated structurally *and* by resolution.
+ */
+export async function assertFetchableProviderUrl(
+  raw: string,
+  opts: { lookup?: Lookup; allowLocalhost?: boolean } = {},
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return { ok: false, message: "Refusing to request a malformed URL." };
+  }
+
+  const loopbackOk = opts.allowLocalhost === true;
+
+  /**
+   * True for the hosts a local dev server is allowed to reach: the machine it is
+   * running on. `localhost` is included here even though it is not an IP literal,
+   * because resolving it is guaranteed to yield a loopback address.
+   */
+  const isLoopbackHost =
+    url.hostname === "127.0.0.1" ||
+    url.hostname === "localhost" ||
+    url.hostname === "::1" ||
+    url.hostname === "[::1]";
+
+  // Loopback is permitted only when the caller explicitly opted in, which only
+  // the local dev server does. Both the structural and the resolution check must
+  // skip it, or the second one would immediately reject what the first allowed.
+  if (loopbackOk && isLoopbackHost) {
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return { ok: false, message: "Provider requests must use http:// or https://." };
+    }
+    return { ok: true };
+  }
+
+  const verdict = validateProviderBaseUrl(url.toString(), {
+    allowHttpLocalDev: loopbackOk,
+  });
+
+  if (verdict.ok) {
+    // Structural checks passed; confirm where the name actually points.
+    const resolved = await assertPublicHost(url.hostname, opts.lookup);
+    if (!resolved.ok) {
+      return { ok: false, message: resolved.message ?? "Host is not reachable." };
+    }
+    return { ok: true };
+  }
+
+  // Being explicit about https avoids echoing an attacker-supplied string back.
+  if (url.protocol !== "https:") {
+    return { ok: false, message: "Provider requests must use https://." };
+  }
+  return { ok: false, message: verdict.message };
+}
+
 /**
  * Why this shape:
  *
+ * - Every request is validated *and* its host is resolved immediately before the
+ *   connection, so a public-looking name that points into the private network is
+ *   refused. The old prefix check did neither.
  * - `redirect: "manual"` means we honour the Location header ourselves and can
  *   refuse to follow a redirect to a private address. A provider that 301s to
  *   169.254.169.254 is an SSRF vector.
@@ -55,8 +135,12 @@ export class ProviderHttpError extends Error {
  * - `duplex: "half"` is required by Node's fetch when a body is streamed.
  */
 export async function providerFetch(req: ProviderRequest): Promise<ProviderResponse> {
-  if (!req.url.startsWith("https://") && !req.url.startsWith("http://127.0.0.1") && !req.url.startsWith("http://localhost")) {
-    throw new Error("Refusing to make a provider request to a non-https URL");
+  const allowed = await assertFetchableProviderUrl(req.url, {
+    lookup: req.lookup,
+    allowLocalhost: req.allowLocalhost,
+  });
+  if (!allowed.ok) {
+    throw new ProviderHttpError(400, allowed.message, new Headers());
   }
 
   const timeout = Math.min(
@@ -130,7 +214,11 @@ export async function providerFetch(req: ProviderRequest): Promise<ProviderRespo
   }
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
+    // Capped: a failing endpoint is still attacker-controlled, and this text is
+    // parsed and partially surfaced to the user.
+    const text = res.body
+      ? await readCappedText(res.body).catch(() => "")
+      : await res.text().catch(() => "");
     await res.body?.cancel().catch(() => {});
     throw new ProviderHttpError(res.status, text, res.headers);
   }
@@ -140,8 +228,17 @@ export async function providerFetch(req: ProviderRequest): Promise<ProviderRespo
     status: res.status,
     headers: res.headers,
     body,
-    text: () => res.text(),
-    json: async <T,>() => (await res.json()) as T,
+    // Capped by default. Every caller here is talking to a Base URL the user
+    // supplied, so an unbounded read is a memory-exhaustion primitive; the cap is
+    // far above any legitimate listing or completion payload.
+    text: async () => {
+      if (!body) return "";
+      return readCappedText(body);
+    },
+    json: async <T,>() => {
+      if (!body) throw new Error("Upstream returned an empty response body.");
+      return JSON.parse(await readCappedText(body)) as T;
+    },
   };
 }
 
@@ -201,13 +298,21 @@ export function isCancellation(err: unknown): boolean {
  * Classify any thrown error into an ApiErrorPayload, redacting secrets.
  * Never throws.
  */
-export function toApiError(err: unknown, providerLabel: string): ApiErrorPayload {
+export function toApiError(
+  err: unknown,
+  providerLabel: string,
+  knownSecrets: readonly string[] = [],
+): ApiErrorPayload {
   if (err instanceof ProviderHttpError) {
-    return upstreamError({
+    const payload = upstreamError({
       status: err.status,
       providerLabel,
       bodyText: err.bodyText,
     });
+    // The provider may have echoed the key back in its error body; redact the
+    // exact value we sent before this reaches the client or the database.
+    if (payload.detail) payload.detail = redactSecrets(payload.detail, knownSecrets);
+    return payload;
   }
   if (err instanceof Error && err.name === "TimeoutError") {
     return {
@@ -217,6 +322,6 @@ export function toApiError(err: unknown, providerLabel: string): ApiErrorPayload
     };
   }
   const payload = transportError(err, providerLabel);
-  payload.detail = payload.detail ? redactSecrets(payload.detail) : undefined;
+  payload.detail = payload.detail ? redactSecrets(payload.detail, knownSecrets) : undefined;
   return payload;
 }

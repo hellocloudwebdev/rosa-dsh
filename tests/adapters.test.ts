@@ -133,6 +133,9 @@ describe("OpenAI-compatible adapter", () => {
       apiKey: "sk-test-abcdefghijklmnop",
       organizationId: null,
       providerLabel: "Test",
+      // The mock provider listens on 127.0.0.1. Production never sets this; the
+      // local dev server sets it so it can reach the user's own Ollama.
+      allowLocalhost: true,
     };
 
     const res = await providerFetch({
@@ -147,6 +150,7 @@ describe("OpenAI-compatible adapter", () => {
         requestId: "r1",
       })),
       timeoutMs: 5000,
+      allowLocalhost: true,
     });
 
     let text = "";
@@ -189,6 +193,9 @@ describe("OpenAI-compatible adapter", () => {
       apiKey: "sk-secret-key-value",
       organizationId: "org-xyz",
       providerLabel: "Test",
+      // The mock provider listens on 127.0.0.1. Production never sets this; the
+      // local dev server sets it so it can reach the user's own Ollama.
+      allowLocalhost: true,
     };
 
     await providerFetch({
@@ -208,6 +215,7 @@ describe("OpenAI-compatible adapter", () => {
         requestId: "r2",
       })),
       timeoutMs: 5000,
+      allowLocalhost: true,
     });
 
     const last = received.at(-1)!;
@@ -304,6 +312,7 @@ describe("OpenAI-compatible adapter", () => {
         apiKey: "sk-x",
         organizationId: null,
         providerLabel: "Test",
+        allowLocalhost: true,
       },
       {
         modelId: "m",
@@ -364,6 +373,7 @@ describe("Anthropic adapter", () => {
         requestId: "r4",
       })),
       timeoutMs: 5000,
+      allowLocalhost: true,
     });
 
     const last = received.at(-1)!;

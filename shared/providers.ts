@@ -1,4 +1,4 @@
-import type { ApiErrorPayload, ProviderPreset, ProviderKind } from "../shared/types.js";
+import type { ApiErrorPayload, ProviderPreset, ProviderKind } from "./types.js";
 
 /**
  * Presets for the providers we ship adapters for.
@@ -142,11 +142,11 @@ export function presetFor(kind: ProviderKind): ProviderPreset {
 
 /** Sensitive substrings that must never be echoed back to a client. */
 const SECRET_PATTERNS: RegExp[] = [
-  /\b(sk|pk|rk)-[A-Za-z0-9_\-]{8,}\b/g,
-  /\bBearer\s+[A-Za-z0-9._\-]+/gi,
+  /\b(sk|pk|rk)-[A-Za-z0-9_-]{8,}\b/g,
+  /\bBearer\s+[A-Za-z0-9._-]+/gi,
   /\bgh[pousr]_[A-Za-z0-9]{16,}\b/g,
-  /\bAIza[0-9A-Za-z_\-]{20,}\b/g,
-  /\bxox[baprs]-[0-9A-Za-z\-]{10,}\b/g,
+  /\bAIza[0-9A-Za-z_-]{20,}\b/g,
+  /\bxox[baprs]-[0-9A-Za-z-]{10,}\b/g,
   /\bAKIA[0-9A-Z]{16}\b/g,
   /\b[a-zA-Z0-9]{40,}\b/g,
 ];
@@ -154,9 +154,20 @@ const SECRET_PATTERNS: RegExp[] = [
 /**
  * Redact anything that looks like a credential from arbitrary text so an error
  * message can be safely returned to the browser or written to a log.
+ *
+ * `knownSecrets` should carry the exact credential values in play for this
+ * request. Pattern matching alone is a heuristic — a provider that echoes back a
+ * short key, or one in an unusual format, would slip past `SECRET_PATTERNS`. A
+ * literal replacement has no such gap, so both are applied.
  */
-export function redactSecrets(input: string): string {
+export function redactSecrets(input: string, knownSecrets: readonly string[] = []): string {
   let out = input;
+  for (const secret of knownSecrets) {
+    // Short values would match ordinary prose; a real credential is never this
+    // small, so the guard avoids mangling a legitimate error message.
+    if (secret.length < 6) continue;
+    out = out.split(secret).join("[redacted]");
+  }
   for (const re of SECRET_PATTERNS) out = out.replace(re, "[redacted]");
   return out;
 }

@@ -5,10 +5,11 @@ import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 
 import { AppDatabase } from "../db/repository.js";
-import { SqliteDriver } from "../db/sqlite.js";
 import { handleApiRequest, type ApiDeps } from "../api.js";
-import { getEnv } from "../env.js";
+import { nodeLookup } from "../dns.js";
+import { HTML_SECURITY_HEADERS, SECURITY_HEADERS, getEnv } from "../env.js";
 import { encryptSecret } from "../db/crypto.js";
+import { resolveNodeDriver, applyMigrations } from "../db/factory.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -30,28 +31,46 @@ const MIME: Record<string, string> = {
 async function main(): Promise<void> {
   const env = getEnv();
   const port = Number.parseInt(env.ROSA_API_PORT ?? "8787", 10);
-  const dbPath = env.ROSA_DB_PATH ?? join(__dirname, "..", "..", ".data", "rosa.db");
-  const distDir = join(__dirname, "..", "..", "dist");
-  const startedAt = Date.now();
+  const distDir = existsSync(join(__dirname, "..", "..", "..", "dist"))
+    ? join(__dirname, "..", "..", "..", "dist")
+    : join(__dirname, "..", "..", "dist");
 
-  const driver = new SqliteDriver(dbPath);
-  await driver.migrate();
-  const canStoreKeys = Boolean(env.ROSA_ENCRYPTION_KEY);
+  // Same driver selection as the deployed entry points, so running locally
+  // exercises the production storage path (D1 over HTTP) when configured.
+  const resolved = await resolveNodeDriver(env);
+  if (resolved.needsMigrate) await applyMigrations(resolved.driver);
+
+  // A key shorter than 32 characters is rejected rather than silently used:
+  // `canStoreKeys` applies the same floor, so a short key would otherwise leave
+  // this message claiming encryption while every save refused.
+  const keyTooShort =
+    typeof env.ROSA_ENCRYPTION_KEY === "string" && env.ROSA_ENCRYPTION_KEY.length < 32;
+  if (keyTooShort) {
+    process.stderr.write(
+      "  ROSA_ENCRYPTION_KEY is shorter than 32 characters; refusing it.\n" +
+        "  Generate one with `npm run keys:generate`. Running in session-only mode.\n",
+    );
+  }
+  const masterKey = keyTooShort ? null : (env.ROSA_ENCRYPTION_KEY ?? null);
+  const canStoreKeys = masterKey !== null;
   if (canStoreKeys) {
     // Validate the key eagerly: a malformed key must fail at boot, not in the
     // middle of the first provider write.
-    await encryptSecret("boot-check", env.ROSA_ENCRYPTION_KEY!);
+    await encryptSecret("boot-check", masterKey);
   }
-  const app = new AppDatabase(driver, env.ROSA_ENCRYPTION_KEY ?? null);
+  const app = new AppDatabase(resolved.driver, masterKey);
 
   const deps: ApiDeps = {
     app,
     env: {
       ...env,
-      ROSA_PUBLIC_APP_URL: env.ROSA_PUBLIC_APP_URL ?? `http://localhost:5173`,
+      ROSA_PUBLIC_APP_URL: env.ROSA_PUBLIC_APP_URL,
       ROSA_API_PREFIX: "/api",
     },
-    startedAt,
+    // The local server is the one place loopback provider URLs are legitimate,
+    // because the user's own Ollama / LM Studio / vLLM runs on this machine.
+    lookup: nodeLookup,
+    allowLocalhost: true,
   };
 
   const server = createServer(async (req, res) => {
@@ -72,13 +91,22 @@ async function main(): Promise<void> {
       return;
     }
 
-    const filePath = join(distDir, rel);
-    if (existsSync(filePath) && existsSync(distDir)) {
+    let targetPath = join(distDir, rel);
+    if (!existsSync(targetPath) && existsSync(distDir) && !extname(rel)) {
+      targetPath = join(distDir, "index.html");
+    }
+
+    if (existsSync(targetPath) && existsSync(distDir)) {
       try {
-        const body = readFileSync(filePath);
+        const body = readFileSync(targetPath);
+        const isHtml = extname(targetPath) === ".html";
         res.writeHead(200, {
-          "content-type": MIME[extname(filePath)] ?? "application/octet-stream",
-          "cache-control": "no-cache",
+          "content-type": MIME[extname(targetPath)] ?? "application/octet-stream",
+          // Hashed asset filenames are safe to cache hard; index.html is not.
+          "cache-control": isHtml ? "no-cache" : "public, max-age=31536000, immutable",
+          // The document and its assets need the HTML policy; the API policy in
+          // SECURITY_HEADERS would block the page's own stylesheet.
+          ...(isHtml ? HTML_SECURITY_HEADERS : SECURITY_HEADERS),
         });
         res.end(body);
         return;
@@ -96,7 +124,7 @@ async function main(): Promise<void> {
   const mode = process.env.NODE_ENV === "production" ? "production" : "development";
   process.stdout.write(
     `\n  ROSA API listening on http://127.0.0.1:${port}  (${mode})\n` +
-      `  database: ${dbPath}\n` +
+      `  database: ${resolved.kind}\n` +
       `  key storage: ${canStoreKeys ? "AES-256-GCM (server-side)" : "session-only (no ROSA_ENCRYPTION_KEY)"}\n\n`,
   );
 
@@ -135,12 +163,21 @@ async function toWebResponse(
   try {
     response = await webRes;
   } catch (err) {
-    res.writeHead(500, { "content-type": "application/json; charset=utf-8" });
+    // The full message goes to the operator's terminal, not to the browser: an
+    // unexpected throw can carry a connection string or a slice of request
+    // state, and this response is not authenticated in any way.
+    process.stderr.write(
+      `[rosa] unhandled API error: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+    );
+    res.writeHead(500, {
+      "content-type": "application/json; charset=utf-8",
+      ...SECURITY_HEADERS,
+    });
     res.end(
       JSON.stringify({
         error: {
           code: "internal",
-          message: `Internal server error: ${err instanceof Error ? err.message : String(err)}`,
+          message: "The server hit an unexpected error. Check the server logs.",
           retryable: true,
         },
       }),
@@ -156,14 +193,16 @@ async function toWebResponse(
       ? (response.headers as unknown as { getSetCookie: () => string[] }).getSetCookie()
       : [];
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string | string[]> = {};
   response.headers.forEach((value, key) => {
     if (key.toLowerCase() === "set-cookie") return;
     headers[key] = value;
   });
+  if (setCookies.length > 0) {
+    headers["set-cookie"] = setCookies;
+  }
 
   res.writeHead(response.status, headers);
-  if (setCookies.length > 0) res.setHeader("set-cookie", setCookies);
 
   if (response.status === 204 || response.status === 205) {
     res.end();

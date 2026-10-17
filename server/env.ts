@@ -19,6 +19,40 @@ export interface ApiEnv {
   ROSA_ALLOW_LOCAL_HTTP?: string;
   NODE_ENV?: string;
   ROSA_DEV_MODE?: string;
+
+  /* ---- Clerk Authentication (Security Priority) ---- */
+  CLERK_PUBLISHABLE_KEY?: string;
+  CLERK_SECRET_KEY?: string;
+  CLERK_JWKS_URL?: string;
+  CLERK_DOMAIN?: string;
+  CLERK_ISSUER?: string;
+
+  /* ---- Supabase Storage ---- */
+  SUPABASE_URL?: string;
+  SUPABASE_ANON_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  SUPABASE_DB_URL?: string;
+  VITE_SUPABASE_URL?: string;
+  VITE_SUPABASE_ANON_KEY?: string;
+
+  /* ---- Storage: resolved by server/db/factory.ts ---- */
+  /** libsql/Turso endpoint (https or libsql scheme). */
+  DATABASE_URL?: string;
+  /** Bearer token for the libsql endpoint, when required. */
+  DATABASE_AUTH_TOKEN?: string;
+  /** Cloudflare account id, for D1 over the HTTP API. */
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  /** D1 database id, for D1 over the HTTP API. */
+  CLOUDFLARE_D1_DATABASE_ID?: string;
+  /** Cloudflare API token with D1 Edit permission. */
+  CLOUDFLARE_API_TOKEN?: string;
+  /** Override the Cloudflare API base (tests / enterprise gateways). */
+  CLOUDFLARE_API_BASE_URL?: string;
+  /** SQLite file for local Node hosting. */
+  ROSA_DB_PATH?: string;
+  /** Apply pending migrations automatically on cold start (default: on). */
+  ROSA_AUTO_MIGRATE?: string;
+
   [key: string]: string | undefined;
 }
 
@@ -73,12 +107,67 @@ export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 /* HTTP helpers                                                        */
 /* ------------------------------------------------------------------ */
 
-/** Standard security headers applied to every API response. */
+/**
+ * Standard security headers applied to every API response.
+ *
+ * This is the single source of truth: `securityHeaderObject()` in `api.ts` reads
+ * from it too, so an SSE stream or an OAuth redirect cannot silently receive a
+ * weaker set than a JSON response. A divergence like that is invisible until
+ * someone audits header-by-header, which is exactly how the previous split was
+ * found.
+ */
 export const SECURITY_HEADERS: Record<string, string> = {
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
   "referrer-policy": "strict-origin-when-cross-origin",
   "cross-origin-opener-policy": "same-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=()",
+  // Two years, subdomains included. Vercel terminates TLS for the app, so this
+  // is the header that keeps a first request from being downgraded.
+  "strict-transport-security": "max-age=63072000; includeSubDomains",
+  /**
+   * The API only ever returns JSON or SSE, never HTML, so the strictest policy
+   * is also the correct one: deny everything, including framing and form
+   * submission. `frame-ancestors 'none'` is the modern `x-frame-options`.
+   */
+  "content-security-policy":
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+};
+
+/**
+ * Content-Security-Policy for the HTML document and its assets.
+ *
+ * Deliberately separate from `SECURITY_HEADERS`, because the API serves JSON and
+ * SSE while this serves a real page, and one policy cannot be correct for both.
+ *
+ * `style-src` must allow `'unsafe-inline'` for style *attributes*: React sets
+ * them directly in three places (the sidebar width custom property, the
+ * login-screen gradient and the message animation delay). Those cannot be
+ * nonce-protected — a nonce covers `<style>` elements, not `style=""`. Everything
+ * else is locked to our own origin, and there is no `unsafe-eval`, so an injected
+ * script has no way to execute.
+ */
+export const HTML_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  // The browser talks only to this origin: the API and its SSE streams.
+  "connect-src 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
+/** Security headers for HTML/static asset responses. */
+export const HTML_SECURITY_HEADERS: Record<string, string> = {
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "strict-transport-security": "max-age=63072000; includeSubDomains",
+  "content-security-policy": HTML_CSP,
   "permissions-policy": "camera=(), microphone=(), geolocation=()",
 };
 
@@ -184,24 +273,56 @@ export function sessionCookieOptions(env: ApiEnv, maxAgeMs: number): CookieOptio
 /* Client IP                                                           */
 /* ------------------------------------------------------------------ */
 
-export function clientIp(req: Request): string {
-  const headers = req.headers;
-  // Vercel
-  const vercel = headers.get("x-vercel-forwarded-for");
-  if (vercel) return vercel.split(",")[0].trim();
-  // Cloudflare
-  const cf = headers.get("cf-connecting-ip");
-  if (cf) return cf.trim();
-  const generic = headers.get("x-forwarded-for");
-  if (generic) return generic.split(",")[0].trim();
-  const real = headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
+/**
+ * Trustworthy client IP, if the platform gives us one.
+ *
+ * `x-vercel-forwarded-for` and `cf-connecting-ip` are set by the platform itself
+ * and a client cannot forge them, because the edge overwrites the header before
+ * the function runs. They are preferred for that reason.
+ *
+ * The generic `x-forwarded-for` / `x-real-ip` fallbacks are *client-supplied* on
+ * any deployment that is not sitting behind a proxy that rewrites them. They are
+ * still read, because the local dev server and self-hosted reverse proxies rely
+ * on them, but the result is marked untrusted so callers do not use a
+ * forgeable value as a security boundary.
+ */
+export interface ClientIp {
+  ip: string;
+  /** False when the value came from a header a client can set freely. */
+  trusted: boolean;
 }
 
-/** Best-effort identification of the caller for rate limiting. */
+export function clientIpInfo(req: Request): ClientIp {
+  const headers = req.headers;
+  const vercel = headers.get("x-vercel-forwarded-for");
+  if (vercel) return { ip: vercel.split(",")[0].trim(), trusted: true };
+  const cf = headers.get("cf-connecting-ip");
+  if (cf) return { ip: cf.trim(), trusted: true };
+  const generic = headers.get("x-forwarded-for");
+  if (generic) return { ip: generic.split(",")[0].trim(), trusted: false };
+  const real = headers.get("x-real-ip");
+  if (real) return { ip: real.trim(), trusted: false };
+  return { ip: "unknown", trusted: false };
+}
+
+export function clientIp(req: Request): string {
+  return clientIpInfo(req).ip;
+}
+
+/**
+ * Best-effort identification of the caller for rate limiting.
+ *
+ * A signed-in user is keyed by id, which cannot be forged. Requests with no
+ * session fall back to the IP, and when that IP is untrusted the caller is
+ * bucketed by the *untrusted* marker rather than by the claimed address — one
+ * shared bucket is a weaker control, but keying on a client-controlled string
+ * would let an attacker mint a fresh bucket per request and bypass the limit
+ * entirely.
+ */
 export function rateLimitSubject(req: Request, userId?: string): string {
-  return userId ?? clientIp(req);
+  if (userId) return userId;
+  const { ip, trusted } = clientIpInfo(req);
+  return trusted ? ip : "untrusted";
 }
 
 /** CORS headers. Same-origin by default; opt into specific origins via env. */
