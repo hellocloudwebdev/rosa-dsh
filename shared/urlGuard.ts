@@ -319,7 +319,8 @@ export function validateProviderBaseUrl(
     return { ok: false, code: "no-host", message: "The URL has no hostname." };
   }
 
-  const isLoopback = host === "127.0.0.1" || host === "0.0.0.0" || host === "[::1]" || host === "::1";
+  const isLoopback =
+    host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "[::1]" || host === "::1";
 
   // Explicitly allow loopback http in local development so users can point at
   // Ollama / LM Studio / vLLM running on their own machine. This must precede

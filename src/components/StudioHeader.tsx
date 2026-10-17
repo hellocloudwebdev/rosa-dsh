@@ -1,92 +1,146 @@
 import { useState } from "react";
-import { Send, Mail, Users, PanelRight, ChevronDown, Check } from "lucide-react";
+import {
+  Server,
+  RotateCcw,
+  PanelRight,
+  ChevronDown,
+  Check,
+  Bot,
+  BarChart2,
+  GitCompare,
+  FileText,
+  Code2,
+} from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { SignInButton, UserButton, useAuth } from "@clerk/react";
-import { AceMoonIcon } from "./icons/AceMoonIcon";
-import { VIEW_LIST } from "./view/views";
 import type { ViewType } from "../types";
 
 interface StudioHeaderProps {
-  campaignTitle: string;
-  onChangeTitle: (title: string) => void;
-  onSendTest: () => void;
-  onDeploy: () => void;
-  /** Currently open View type (null = no View open) */
+  conversationTitle: string;
+  onUpdateTitle: (title: string) => void;
+  paneCount: 1 | 2 | 3 | 4;
+  onSetPaneCount: (count: 1 | 2 | 3 | 4) => void;
+  providerCount: number;
+  onOpenProvidersModal: () => void;
+  onResetChat: () => void;
   viewType: ViewType | null;
   onOpenView: (t: ViewType) => void;
 }
 
+const VIEW_OPTIONS: { type: ViewType; label: string; icon: typeof BarChart2 }[] = [
+  { type: "inspector", label: "Metrics & Inspector", icon: BarChart2 },
+  { type: "diff", label: "Side-by-Side Diff", icon: GitCompare },
+  { type: "markdown", label: "Raw Markdown", icon: FileText },
+  { type: "json", label: "JSON Event Trace", icon: Code2 },
+];
+
 export function StudioHeader({
-  campaignTitle,
-  onChangeTitle,
-  onSendTest,
-  onDeploy,
+  conversationTitle,
+  onUpdateTitle,
+  paneCount,
+  onSetPaneCount,
+  providerCount,
+  onOpenProvidersModal,
+  onResetChat,
   viewType,
   onOpenView,
 }: StudioHeaderProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(conversationTitle);
   const { isSignedIn } = useAuth();
 
+  const handleFinishEditing = () => {
+    setIsEditingTitle(false);
+    if (titleDraft.trim() && titleDraft !== conversationTitle) {
+      onUpdateTitle(titleDraft.trim());
+    }
+  };
+
   return (
-    <header className="border-b border-[var(--border-subtle)] px-5 py-2.5 flex items-center justify-between bg-[var(--bg-panel)] shrink-0 z-20 transition-colors">
-      {/* Left: breadcrumbs + title */}
-      <div className="flex items-center gap-3 overflow-hidden">
-        <div className="hidden md:flex items-center gap-2 text-xs text-[var(--text-muted)] shrink-0">
-          <span className="hover:text-[var(--text-secondary)] cursor-pointer">Acme AI</span>
-          <span>/</span>
-          <span className="flex items-center gap-1.5 text-[var(--text-secondary)] font-medium">
-            <AceMoonIcon className="w-3 h-3" />
-            Ace Studio
+    <header className="border-b border-[var(--border-subtle)] px-4 sm:px-6 py-2.5 flex items-center justify-between bg-[var(--bg-panel)] shrink-0 z-20 transition-colors">
+      {/* Left: Breadcrumbs & Editable Conversation Title */}
+      <div className="flex items-center gap-3 overflow-hidden min-w-0">
+        <div className="hidden lg:flex items-center gap-2 text-xs text-[var(--text-muted)] shrink-0">
+          <span className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+            <Bot className="w-3.5 h-3.5 text-[var(--lime-text)]" />
+            <span>Rosa</span>
           </span>
+          <span>/</span>
+          <span>Workspace</span>
           <span>/</span>
         </div>
 
         {isEditingTitle ? (
           <input
             type="text"
-            value={campaignTitle}
-            onChange={(e) => onChangeTitle(e.target.value)}
-            onBlur={() => setIsEditingTitle(false)}
-            onKeyDown={(e) => e.key === "Enter" && setIsEditingTitle(false)}
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={handleFinishEditing}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleFinishEditing();
+              if (e.key === "Escape") setIsEditingTitle(false);
+            }}
             autoFocus
-            className="text-sm font-semibold text-[var(--text-primary)] bg-[var(--active-overlay)] px-2 py-0.5 rounded outline-none w-64"
+            className="text-xs font-semibold text-[var(--text-primary)] bg-[var(--active-overlay)] px-2 py-1 rounded-lg outline-none w-56 sm:w-72 border border-[var(--lime)]"
           />
         ) : (
           <h2
-            onClick={() => setIsEditingTitle(true)}
-            className="text-sm font-semibold text-[var(--text-primary)] tracking-tight cursor-pointer hover:bg-[var(--hover-overlay)] px-1.5 py-0.5 rounded transition-colors truncate"
-            title="Click to edit campaign name"
+            onClick={() => {
+              setTitleDraft(conversationTitle);
+              setIsEditingTitle(true);
+            }}
+            className="text-xs sm:text-sm font-semibold text-[var(--text-primary)] tracking-tight cursor-pointer hover:bg-[var(--hover-overlay)] px-2 py-1 rounded-lg transition-colors truncate max-w-[200px] sm:max-w-xs md:max-w-md"
+            title="Click to rename conversation"
           >
-            {campaignTitle}
+            {conversationTitle || "New Conversation"}
           </h2>
         )}
 
-        <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--chip-bg)] text-[var(--text-secondary)] text-xs font-medium shrink-0">
-          <Users className="w-3 h-3" />
-          <span>48.2k Subscribers</span>
-        </div>
-
-        <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-white px-2 py-0.5 rounded-full shrink-0 bg-[#558766]">
-          <span className="w-1.5 h-1.5 rounded-full bg-white/90 animate-pulse" />
-          <span>Draft Synced</span>
-        </div>
+        {/* Active Providers Chip */}
+        <button
+          onClick={onOpenProvidersModal}
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--lime)]/10 text-[var(--lime-text)] border border-[var(--lime)]/20 hover:bg-[var(--lime)]/20 transition-colors cursor-pointer shrink-0"
+          title="Open Custom Providers Configuration"
+        >
+          <Server className="w-3 h-3" />
+          <span>{providerCount} {providerCount === 1 ? "Provider" : "Providers"}</span>
+        </button>
       </div>
 
-      {/* Right: View launcher + actions */}
+      {/* Right: Comparison Panes Selector, Views, Actions */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Open / switch the contextual View panel */}
+        {/* Pane Count / Comparison Mode Selector */}
+        <div className="flex items-center rounded-lg border border-[var(--border-strong)] bg-[var(--bg-panel-2)] p-0.5">
+          {([1, 2, 3, 4] as const).map((count) => (
+            <button
+              key={count}
+              type="button"
+              onClick={() => onSetPaneCount(count)}
+              className={`px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                paneCount === count
+                  ? "bg-[var(--lime)] text-white font-semibold shadow-xs"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+              title={count === 1 ? "Single Model Chat" : `Compare ${count} Models Side-by-Side`}
+            >
+              {count === 1 ? "1 Pane" : `${count}x`}
+            </button>
+          ))}
+        </div>
+
+        {/* Open contextual View panel */}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-lg transition-colors cursor-pointer ${
                 viewType
                   ? "border-[var(--lime)]/60 bg-[var(--lime)]/15 text-[var(--lime-text)]"
                   : "border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
             >
               <PanelRight className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">
-                {viewType ? (VIEW_LIST.find((v) => v.type === viewType)?.label ?? "View") : "Open View"}
+              <span className="hidden md:inline">
+                {viewType ? (VIEW_OPTIONS.find((v) => v.type === viewType)?.label ?? "View") : "Inspector"}
               </span>
               <ChevronDown className="w-3 h-3 opacity-60" />
             </button>
@@ -95,52 +149,50 @@ export function StudioHeader({
             <DropdownMenu.Content
               align="end"
               sideOffset={6}
-              className="w-52 bg-[#262e28] rounded-xl p-1.5 border border-white/5 shadow-2xl z-50 focus:outline-none"
+              className="w-52 bg-[var(--bg-panel-2)] rounded-xl p-1.5 border border-[var(--border-strong)] shadow-2xl z-50 focus:outline-none"
             >
-              <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
-                Open a View
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                Inspector Panels
               </div>
-              {VIEW_LIST.map((v) => (
-                <DropdownMenu.Item
-                  key={v.type}
-                  onSelect={() => onOpenView(v.type)}
-                  className={`flex items-center justify-between px-2.5 py-2 text-sm rounded-lg cursor-pointer outline-none transition-colors ${
-                    viewType === v.type
-                      ? "bg-white/10 text-white font-medium"
-                      : "text-neutral-300 hover:bg-white/5"
-                  }`}
-                >
-                  <span className="flex items-center gap-2.5">
-                    <span className="text-[var(--lime-text)]">{v.icon}</span>
-                    {v.label}
-                  </span>
-                  {viewType === v.type && <Check className="w-3.5 h-3.5 text-neutral-200" />}
-                </DropdownMenu.Item>
-              ))}
+              {VIEW_OPTIONS.map((v) => {
+                const VIcon = v.icon;
+                return (
+                  <DropdownMenu.Item
+                    key={v.type}
+                    onSelect={() => onOpenView(v.type)}
+                    className={`flex items-center justify-between px-2.5 py-2 text-xs rounded-lg cursor-pointer outline-none transition-colors ${
+                      viewType === v.type
+                        ? "bg-[var(--active-overlay)] text-[var(--text-primary)] font-medium"
+                        : "text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <VIcon className="w-3.5 h-3.5 text-[var(--lime-text)]" />
+                      <span>{v.label}</span>
+                    </span>
+                    {viewType === v.type && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                  </DropdownMenu.Item>
+                );
+              })}
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
 
+        {/* Reset Chat button */}
         <button
-          onClick={onSendTest}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+          onClick={onResetChat}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+          title="Clear & Reset current chat"
         >
-          <Mail className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-          <span className="hidden sm:inline">Send Test</span>
+          <RotateCcw className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+          <span className="hidden sm:inline">Reset</span>
         </button>
 
-        <button
-          onClick={onDeploy}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold bg-[var(--lime)] text-white hover:opacity-90 rounded-lg transition-all cursor-pointer"
-        >
-          <Send className="w-3.5 h-3.5" />
-          <span>Deploy Campaign</span>
-        </button>
-
-        <div className="flex items-center ml-2 border-l border-[var(--border-subtle)] pl-2">
+        {/* User Auth: Clerk or Dev */}
+        <div className="flex items-center ml-1 border-l border-[var(--border-subtle)] pl-2">
           {!isSignedIn ? (
             <SignInButton mode="modal">
-              <button className="px-3 py-1.5 text-xs font-semibold border border-[var(--border-strong)] rounded-lg hover:bg-[var(--hover-overlay)] text-[var(--text-primary)] transition-colors cursor-pointer">
+              <button className="px-2.5 py-1.5 text-xs font-semibold border border-[var(--border-strong)] rounded-lg hover:bg-[var(--hover-overlay)] text-[var(--text-primary)] transition-colors cursor-pointer">
                 Sign In
               </button>
             </SignInButton>

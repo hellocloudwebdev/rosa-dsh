@@ -511,7 +511,7 @@ async function handleCreateProvider(
   const kind = body.kind as ProviderKind;
   const preset = presetFor(kind);
   const verdict = validateProviderBaseUrl(body.baseUrl, {
-    allowHttpLocalDev: allowLocal(deps.env),
+    allowHttpLocalDev: Boolean(deps.allowLocalhost || allowLocal(deps.env)),
   });
   if (!verdict.ok) {
     return errorFromCode("bad-request", verdict.message, 400, {
@@ -520,13 +520,17 @@ async function handleCreateProvider(
   }
 
   try {
-    const provider = await deps.app.createProvider(userId, {
-      kind,
-      displayName: body.displayName?.trim() || preset.label,
-      baseUrl: verdict.normalized,
-      apiKey: body.apiKey,
-      organizationId: body.organizationId ?? null,
-    });
+    const provider = await deps.app.createProvider(
+      userId,
+      {
+        kind,
+        displayName: body.displayName?.trim() || preset.label,
+        baseUrl: verdict.normalized,
+        apiKey: body.apiKey,
+        organizationId: body.organizationId ?? null,
+      },
+      { allowHttpLocalDev: Boolean(deps.allowLocalhost || allowLocal(deps.env)) },
+    );
     return json({ provider, discoveryAvailable: preset.supportsListing }, { status: 201 });
   } catch (err) {
     return errorFromCode("bad-request", messageOf(err), 400);
@@ -548,7 +552,7 @@ async function handleUpdateProvider(
   }>(req);
   if (body?.baseUrl) {
     const verdict = validateProviderBaseUrl(body.baseUrl, {
-      allowHttpLocalDev: allowLocal(deps.env),
+      allowHttpLocalDev: Boolean(deps.allowLocalhost || allowLocal(deps.env)),
     });
     if (!verdict.ok) {
       return errorFromCode("bad-request", verdict.message, 400, {
@@ -558,7 +562,12 @@ async function handleUpdateProvider(
     body.baseUrl = verdict.normalized;
   }
   try {
-    await deps.app.updateProvider(userId, providerId, body ?? {});
+    await deps.app.updateProvider(
+      userId,
+      providerId,
+      body ?? {},
+      { allowHttpLocalDev: Boolean(deps.allowLocalhost || allowLocal(deps.env)) },
+    );
     const provider = await deps.app.getProvider(userId, providerId);
     if (!provider) return notFound("Provider");
     return json({ provider });
@@ -990,14 +999,25 @@ async function handleOAuthStart(
       userAgent: req.headers.get("user-agent") ?? "local-browser",
       ip: "127.0.0.1",
     });
-    const appUrl = deps.env.ROSA_PUBLIC_APP_URL ?? url.origin;
     const cookie = cookieHeader(
       SESSION_COOKIE,
       encodeURIComponent(token),
       sessionCookieOptions(deps.env, SESSION_TTL_MS),
     );
+
+    // If client requested JSON or used POST, return JSON directly
+    if (req.method === "POST" || req.headers.get("accept")?.includes("application/json")) {
+      const headers = new Headers({
+        "set-cookie": cookie,
+        "content-type": "application/json",
+      });
+      for (const [k, v] of Object.entries(securityHeaderObject())) headers.set(k, v);
+      return new Response(JSON.stringify({ ok: true, token, user }), { status: 200, headers });
+    }
+
+    const appUrl = deps.allowLocalhost ? url.origin : (deps.env.ROSA_PUBLIC_APP_URL ?? url.origin);
     const headers = new Headers({
-      location: `${appUrl}/app`,
+      location: `${appUrl}/`,
       "set-cookie": cookie,
     });
     for (const [k, v] of Object.entries(securityHeaderObject())) headers.set(k, v);

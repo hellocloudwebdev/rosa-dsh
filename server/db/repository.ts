@@ -154,9 +154,10 @@ export class AppDatabase {
   async createProvider(
     userId: string,
     input: CreateProviderInput,
+    opts?: { allowHttpLocalDev?: boolean },
   ): Promise<ProviderConfig> {
     const verdict = validateProviderBaseUrl(input.baseUrl, {
-      allowHttpLocalDev: this.opts.allowHttpLocalDev,
+      allowHttpLocalDev: opts?.allowHttpLocalDev ?? this.opts.allowHttpLocalDev,
     });
     if (!verdict.ok) {
       throw new Error(verdict.message);
@@ -200,7 +201,12 @@ export class AppDatabase {
     return this.getProvider(userId, id) as Promise<ProviderConfig>;
   }
 
-  async updateProvider(userId: string, id: string, input: UpdateProviderInput): Promise<void> {
+  async updateProvider(
+    userId: string,
+    id: string,
+    input: UpdateProviderInput,
+    opts?: { allowHttpLocalDev?: boolean },
+  ): Promise<void> {
     const existing = await this.getProviderRow(userId, id);
     if (!existing) throw new Error("Provider not found.");
 
@@ -213,7 +219,7 @@ export class AppDatabase {
     }
     if (input.baseUrl !== undefined) {
       const verdict = validateProviderBaseUrl(input.baseUrl, {
-        allowHttpLocalDev: this.opts.allowHttpLocalDev,
+        allowHttpLocalDev: opts?.allowHttpLocalDev ?? this.opts.allowHttpLocalDev,
       });
       if (!verdict.ok) throw new Error(verdict.message);
       sets.push("base_url = ?");

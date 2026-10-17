@@ -12,7 +12,7 @@
     "build:api": "tsc -p tsconfig.server.json",
     "preview": "vite preview",
     "typecheck": "tsc -b --force",
-    "typecheck:app": "tsc -p tsconfig.json --noEmit",
+    "typecheck:app": "tsc -p tsconfig.app.json --noEmit",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",

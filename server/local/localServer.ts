@@ -58,7 +58,7 @@ async function main(): Promise<void> {
     // middle of the first provider write.
     await encryptSecret("boot-check", masterKey);
   }
-  const app = new AppDatabase(resolved.driver, masterKey);
+  const app = new AppDatabase(resolved.driver, masterKey, { allowHttpLocalDev: true });
 
   const deps: ApiDeps = {
     app,
@@ -66,6 +66,7 @@ async function main(): Promise<void> {
       ...env,
       ROSA_PUBLIC_APP_URL: env.ROSA_PUBLIC_APP_URL,
       ROSA_API_PREFIX: "/api",
+      ROSA_ALLOW_LOCAL_HTTP: "1",
     },
     // The local server is the one place loopback provider URLs are legitimate,
     // because the user's own Ollama / LM Studio / vLLM runs on this machine.

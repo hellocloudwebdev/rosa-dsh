@@ -1,46 +1,55 @@
-export type NavItemId =
-  | "new-email"
-  | "templates"
-  | "my-brands"
-  | "brand-images"
-  | "campaigns"
-  | "audience"
-  | "sending-domains"
-  | "sending-activity"
-  | "history";
+export * from "@shared/types.js";
+import type { TurnMetrics } from "@shared/types.js";
 
-export interface GeneratedEmail {
-  subject: string;
-  previewText: string;
-  headline: string;
-  body: string[];
-  ctaText: string;
-  ctaLink: string;
-}
+export type NavItemId =
+  | "new-chat"
+  | "providers"
+  | "models"
+  | "prompt-library"
+  | "history"
+  | "settings";
 
 export interface SuggestionPrompt {
   id: string;
-  iconType: "plus" | "scan" | "globe";
+  iconType: "plus" | "scan" | "globe" | "code" | "sparkles";
   verb: string;
   rest: string;
   fullPrompt: string;
+  category?: string;
 }
 
 export interface Msg {
-  id: number;
-  role: "user" | "assistant";
+  id: string | number;
+  role: "system" | "user" | "assistant";
   text: string;
-  meta: string;
+  meta?: string;
+  providerId?: string | null;
+  modelId?: string | null;
+  modelLabel?: string | null;
+  metrics?: TurnMetrics | null;
+  error?: string | null;
+  paneIndex?: number | null;
+  createdAt?: number;
 }
 
 /** Contextual visual surfaces shown in the right-hand View panel. */
 export type ViewType =
-  | "email"
-  | "browser"
-  | "code"
-  | "markdown"
-  | "pdf"
-  | "image"
+  | "inspector"
   | "diff"
-  | "terminal"
-  | "project";
+  | "markdown"
+  | "code"
+  | "json"
+  | "models"
+  | "providers";
+
+export interface ChatPane {
+  id: number;
+  providerId: string;
+  modelId: string;
+  modelLabel: string;
+  streaming: boolean;
+  streamingContent: string;
+  metrics: TurnMetrics | null;
+  error: string | null;
+  activeRequestId?: string | null;
+}

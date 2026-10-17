@@ -6,15 +6,10 @@ import type { ViewType } from "../../types";
 import {
   VIEW_LIST,
   viewMeta,
-  EmailPreviewView,
-  BrowserView,
-  CodeView,
-  MarkdownView,
-  PdfView,
-  ImageView,
+  InspectorView,
   DiffView,
-  TerminalView,
-  ProjectView,
+  MarkdownView,
+  JsonView,
   type ViewProps,
 } from "./views";
 
@@ -28,7 +23,7 @@ interface ViewPanelProps {
   viewProps: ViewProps;
 }
 
-const MIN_WIDTH = 400;
+const MIN_WIDTH = 380;
 
 export function ViewPanel({
   viewType,
@@ -61,24 +56,16 @@ export function ViewPanel({
 
   const renderView = () => {
     switch (viewType) {
-      case "email":
-        return <EmailPreviewView {...viewProps} />;
-      case "browser":
-        return <BrowserView {...viewProps} />;
-      case "code":
-        return <CodeView {...viewProps} />;
-      case "markdown":
-        return <MarkdownView {...viewProps} />;
-      case "pdf":
-        return <PdfView {...viewProps} />;
-      case "image":
-        return <ImageView {...viewProps} />;
+      case "inspector":
+        return <InspectorView {...viewProps} />;
       case "diff":
         return <DiffView {...viewProps} />;
-      case "terminal":
-        return <TerminalView {...viewProps} />;
-      case "project":
-        return <ProjectView {...viewProps} />;
+      case "markdown":
+        return <MarkdownView {...viewProps} />;
+      case "json":
+        return <JsonView {...viewProps} />;
+      default:
+        return <InspectorView {...viewProps} />;
     }
   };
 
@@ -95,16 +82,16 @@ export function ViewPanel({
       <div
         onPointerDown={handleResizeStart}
         className="absolute inset-y-0 left-0 w-1 cursor-col-resize hover:bg-[var(--lime)]/50 transition-colors z-30"
-        title="Drag to resize"
+        title="Drag to resize panel"
       />
 
       {/* Panel header */}
       <div className="h-12 shrink-0 border-b border-[var(--border-subtle)] px-3 flex items-center justify-between">
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-[var(--hover-overlay)] text-sm text-[var(--text-primary)] cursor-pointer outline-none transition-colors">
+            <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-[var(--hover-overlay)] text-xs text-[var(--text-primary)] cursor-pointer outline-none transition-colors border border-transparent hover:border-[var(--border-subtle)]">
               <span className="text-[var(--lime-text)]">{meta.icon}</span>
-              <span className="font-medium">{meta.label}</span>
+              <span className="font-semibold">{meta.label}</span>
               <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
             </button>
           </DropdownMenu.Trigger>
@@ -112,23 +99,23 @@ export function ViewPanel({
             <DropdownMenu.Content
               align="start"
               sideOffset={6}
-              className="w-52 bg-[#262e28] rounded-xl p-1.5 border border-white/5 shadow-2xl z-50 focus:outline-none"
+              className="w-52 bg-[var(--bg-panel-2)] rounded-xl p-1.5 border border-[var(--border-strong)] shadow-2xl z-50 focus:outline-none"
             >
               {VIEW_LIST.map((v) => (
                 <DropdownMenu.Item
                   key={v.type}
                   onSelect={() => onTypeChange(v.type)}
-                  className={`flex items-center justify-between px-2.5 py-2 text-sm rounded-lg cursor-pointer outline-none transition-colors ${
+                  className={`flex items-center justify-between px-2.5 py-2 text-xs rounded-lg cursor-pointer outline-none transition-colors ${
                     v.type === viewType
-                      ? "bg-white/10 text-white font-medium"
-                      : "text-neutral-300 hover:bg-white/5"
+                      ? "bg-[var(--active-overlay)] text-[var(--text-primary)] font-semibold"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]"
                   }`}
                 >
                   <span className="flex items-center gap-2.5">
                     <span className="text-[var(--lime-text)]">{v.icon}</span>
-                    {v.label}
+                    <span>{v.label}</span>
                   </span>
-                  {v.type === viewType && <Check className="w-3.5 h-3.5 text-neutral-200" />}
+                  {v.type === viewType && <Check className="w-3.5 h-3.5 text-emerald-400" />}
                 </DropdownMenu.Item>
               ))}
             </DropdownMenu.Content>
@@ -154,8 +141,8 @@ export function ViewPanel({
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-[var(--bg-panel)]/70 backdrop-blur-[2px] flex items-center justify-center z-20"
             >
-              <span className="text-sm font-medium text-[var(--text-secondary)]">
-                Generating view…
+              <span className="text-xs font-medium text-[var(--text-secondary)]">
+                Sampling stream…
               </span>
             </motion.div>
           )}

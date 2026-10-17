@@ -279,6 +279,15 @@ export async function authenticate(
     if (token) {
       const clerkAuth = await verifyClerkToken(token, env, app);
       if (clerkAuth) return clerkAuth;
+
+      // Rosa session token via Authorization Bearer header
+      if (token.length >= 20) {
+        const tokenHash = await sha256Hex(token);
+        const resolved = await app.resolveSession(tokenHash);
+        if (resolved) {
+          return { userId: resolved.userId, sessionTokenHash: tokenHash, expiresAt: resolved.expiresAt };
+        }
+      }
     }
   }
 
