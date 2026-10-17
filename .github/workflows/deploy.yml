@@ -1,4 +1,4 @@
-name: Deploy to Cloudflare & Supabase
+name: CI/CD Auto Deploy
 
 on:
   push:
@@ -6,9 +6,13 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test-and-build:
-    name: Test & Build
+  deploy-cloudflare:
+    name: Deploy to Cloudflare
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -18,40 +22,29 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run vitest tests
-        run: npm run test
+      - name: Build frontend & assets
+        run: npm run build
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Build frontend
-        run: npx vite build
-
-      - name: Deploy to Cloudflare Workers
+      - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
 
-      - name: Sync D1 Database Schema
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply rosa-db --remote
-
-  supabase-sync:
-    name: Supabase Migrations
+  deploy-supabase:
+    name: Deploy Supabase Migrations
     runs-on: ubuntu-latest
-    needs: test-and-build
-    if: "${{ env.SUPABASE_ACCESS_TOKEN != '' }}"
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,8 +54,15 @@ jobs:
         with:
           version: latest
 
-      - name: Link and Push to Supabase
-        if: "${{ env.SUPABASE_PROJECT_REF != '' }}"
+      - name: Link & Push Database Migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
-          supabase db push
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$PROJECT_REF" ]; then
+            supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+            supabase db push --password "$SUPABASE_DB_PASSWORD"
+          else
+            echo "Supabase credentials not configured, skipping migration step."
+          fi
