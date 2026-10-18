@@ -1,14 +1,20 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createServer, type Server } from "node:http";
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { ChatRun } from "../server/chatRun.js";
 import { OpenAICompatibleAdapter } from "../server/adapters/openai.js";
 import type { StreamEvent } from "../shared/types.js";
 
+type RouteEntry = {
+  body?: string;
+  headers?: Record<string, string>;
+  handler?: (req: IncomingMessage, res: ServerResponse) => void;
+};
+
 describe("ChatRun", () => {
   let server: Server;
   let baseUrl: string;
-  const routes = new Map<string, { body: string; headers?: Record<string, string> }>();
+  const routes = new Map<string, RouteEntry>();
 
   beforeAll(async () => {
     server = createServer((req, res) => {
@@ -18,6 +24,10 @@ describe("ChatRun", () => {
       if (!route) {
         res.writeHead(404, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: { message: `no route for ${key}` } }));
+        return;
+      }
+      if (route.handler) {
+        route.handler(req, res);
         return;
       }
       res.writeHead(200, {
@@ -249,5 +259,117 @@ describe("ChatRun", () => {
     if (doneEvent && doneEvent.type === "done") {
       expect(doneEvent.finishReason).toBe("cancelled");
     }
+  });
+
+  it("times out when chunks stop arriving and inactivity window expires", async () => {
+    let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
+    routes.set("POST /chat/completions", {
+      handler: (_req, res) => {
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+        });
+        res.write('data: {"choices":[{"delta":{"content":"First chunk"}}]}\n\n');
+        // Do not send anything else; clean up after 500ms so socket closes
+        cleanupTimer = setTimeout(() => {
+          try {
+            res.end();
+          } catch {
+            /* ignore */
+          }
+        }, 500);
+      },
+    });
+
+    const run = new ChatRun("req-inactivity-1", "TestProvider");
+    const adapter = new OpenAICompatibleAdapter();
+    const events: StreamEvent[] = [];
+
+    await run.run({
+      adapter,
+      ctx: {
+        baseUrl,
+        apiKey: "sk-test",
+        organizationId: null,
+        providerLabel: "TestProvider",
+        allowLocalhost: true,
+      },
+      opts: {
+        modelId: "gpt-mock",
+        messages: [{ role: "user", content: "hello" }],
+        stream: true,
+        timeoutMs: 80, // Inactivity timeout 80ms
+        requestId: "req-inactivity-1",
+      },
+      emit: (e) => events.push(e),
+    });
+
+    clearTimeout(cleanupTimer);
+
+    const errorEvent = events.find((e) => e.type === "error");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent).toMatchObject({
+      type: "error",
+      error: {
+        code: "upstream-timeout",
+        retryable: true,
+      },
+    });
+    expect(run.error?.code).toBe("upstream-timeout");
+  });
+
+  it("completes successfully when chunks arrive steadily past the inactivity timeout", async () => {
+    routes.set("POST /chat/completions", {
+      handler: (_req, res) => {
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+        });
+
+        // Send 4 chunks 35ms apart (total elapsed ~105ms, exceeding 70ms inactivity window)
+        res.write('data: {"choices":[{"delta":{"content":"Part1"}}]}\n\n');
+        setTimeout(() => {
+          res.write('data: {"choices":[{"delta":{"content":"Part2"}}]}\n\n');
+          setTimeout(() => {
+            res.write('data: {"choices":[{"delta":{"content":"Part3"}}]}\n\n');
+            setTimeout(() => {
+              res.write("data: [DONE]\n\n");
+              res.end();
+            }, 35);
+          }, 35);
+        }, 35);
+      },
+    });
+
+    const run = new ChatRun("req-steady-1", "TestProvider");
+    const adapter = new OpenAICompatibleAdapter();
+    const events: StreamEvent[] = [];
+
+    await run.run({
+      adapter,
+      ctx: {
+        baseUrl,
+        apiKey: "sk-test",
+        organizationId: null,
+        providerLabel: "TestProvider",
+        allowLocalhost: true,
+      },
+      opts: {
+        modelId: "gpt-mock",
+        messages: [{ role: "user", content: "hello" }],
+        stream: true,
+        timeoutMs: 70, // 70ms inactivity window
+        requestId: "req-steady-1",
+      },
+      emit: (e) => events.push(e),
+    });
+
+    const errorEvent = events.find((e) => e.type === "error");
+    expect(errorEvent).toBeUndefined();
+
+    const doneEvent = events.find((e) => e.type === "done");
+    expect(doneEvent).toBeDefined();
+    expect(run.text).toBe("Part1Part2Part3");
+    expect(run.error).toBeNull();
   });
 });

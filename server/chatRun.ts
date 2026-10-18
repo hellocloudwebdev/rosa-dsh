@@ -1,7 +1,13 @@
 import type { ApiErrorPayload, StreamEvent, TurnMetrics } from "../shared/types.js";
 import type { ProviderAdapter } from "./adapters/index.js";
 import type { AdapterContext, ChatOptions } from "./adapters/base.js";
-import { providerFetch, isCancellation, toApiError, decodeTextStream } from "./http.js";
+import {
+  providerFetch,
+  isCancellation,
+  toApiError,
+  decodeTextStream,
+  MAX_UPSTREAM_TIMEOUT_MS,
+} from "./http.js";
 import { SSEParser } from "../shared/sse.js";
 import { presetFor } from "../shared/providers.js";
 
@@ -99,6 +105,7 @@ export class ChatRun {
     const call = adapterCall(adapter);
 
     let body: ReadableStream<Uint8Array> | null = null;
+    const outerTimeoutMs = Math.max(MAX_UPSTREAM_TIMEOUT_MS, opts.timeoutMs ?? 0);
     try {
       const res = await providerFetch({
         url: call.chatUrl(ctx, opts.modelId),
@@ -109,7 +116,7 @@ export class ChatRun {
           ...call.chatHeaders(ctx, opts.modelId),
         },
         body: JSON.stringify(call.buildBody(ctx, options)),
-        timeoutMs: opts.timeoutMs,
+        timeoutMs: outerTimeoutMs,
         signal: this.signal,
         lookup: ctx.lookup,
         allowLocalhost: ctx.allowLocalhost,
@@ -152,18 +159,58 @@ export class ChatRun {
       },
     });
 
+    let timedOut = false;
+    let inactivityTimer: ReturnType<typeof setTimeout> | undefined;
+    const inactivityTimeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : 120_000;
+    const armTimer = () => {
+      clearTimeout(inactivityTimer);
+      if (inactivityTimeoutMs > 0 && !this.cancelled && !this.controller.signal.aborted) {
+        inactivityTimer = setTimeout(() => {
+          timedOut = true;
+          this.controller.abort(new DOMException("timeout", "TimeoutError"));
+        }, inactivityTimeoutMs);
+      }
+    };
+
+    const onAbort = () => {
+      body?.cancel(this.controller.signal.reason).catch(() => {});
+    };
+    if (this.controller.signal.aborted) {
+      onAbort();
+    } else {
+      this.controller.signal.addEventListener("abort", onAbort, { once: true });
+    }
+
     try {
+      armTimer();
       for await (const chunk of decodeTextStream(body)) {
-        if (this.cancelled) break;
+        if (this.cancelled || timedOut) break;
+        armTimer();
         parser.push(chunk);
       }
+      clearTimeout(inactivityTimer);
       parser.flush();
     } catch (err) {
-      if (isCancellation(err) || this.cancelled) {
+      clearTimeout(inactivityTimer);
+      if (!timedOut && (isCancellation(err) || this.cancelled)) {
         this.emitCancelled(emit);
         return;
       }
-      this.errored = this.apiError(err, ctx);
+      const effectiveErr = timedOut ? new DOMException("timeout", "TimeoutError") : err;
+      this.errored = this.apiError(effectiveErr, ctx);
+      emit({ type: "error", error: this.errored });
+      return;
+    } finally {
+      clearTimeout(inactivityTimer);
+      this.controller.signal.removeEventListener("abort", onAbort);
+    }
+
+    if (timedOut) {
+      this.errored = {
+        code: "upstream-timeout",
+        message: `${this.providerLabel} did not respond in time.`,
+        retryable: true,
+      };
       emit({ type: "error", error: this.errored });
       return;
     }

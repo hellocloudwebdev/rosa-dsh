@@ -9,8 +9,9 @@ import type { ApiErrorPayload } from "../shared/types.js";
 /**
  * Hard cap on how long a single provider request may take, regardless of what
  * the client asked for. Keeps a stuck upstream from pinning a function slot.
+ * Outer safety net raised to 15 minutes; streaming paths re-arm inactivity timers.
  */
-export const MAX_UPSTREAM_TIMEOUT_MS = 300_000; // 5 minutes
+export const MAX_UPSTREAM_TIMEOUT_MS = 900_000; // 15 minutes
 export const MIN_UPSTREAM_TIMEOUT_MS = 5_000;
 /** Cap on a model-listing response body. */
 export const MAX_LISTING_BYTES = 2_000_000;
@@ -177,11 +178,23 @@ export async function providerFetch(req: ProviderRequest): Promise<ProviderRespo
     if (req.signal) req.signal.removeEventListener("abort", onAbort);
     const aborted = controller.signal.aborted;
     const upstreamTimedOut = timer.aborted;
-    if (aborted && !upstreamTimedOut) {
+    const reason = controller.signal.reason ?? req.signal?.reason;
+    const isTimeout =
+      upstreamTimedOut ||
+      (reason instanceof Error && reason.name === "TimeoutError") ||
+      (reason instanceof DOMException && reason.name === "TimeoutError") ||
+      (typeof reason === "string" && reason.toLowerCase().includes("timeout"));
+
+    if (aborted && !isTimeout) {
       // Client-driven cancellation: rethrow as a cancellation marker.
       const e = new Error("__CANCELLED__");
       (e as Error & { cause?: unknown }).cause = err;
       throw e;
+    }
+    if (isTimeout && !(err instanceof Error && err.name === "TimeoutError")) {
+      const timeoutErr = new DOMException("timeout", "TimeoutError");
+      (timeoutErr as unknown as { cause?: unknown }).cause = err;
+      throw timeoutErr;
     }
     throw err;
   } finally {
@@ -314,7 +327,13 @@ export function toApiError(
     if (payload.detail) payload.detail = redactSecrets(payload.detail, knownSecrets);
     return payload;
   }
-  if (err instanceof Error && err.name === "TimeoutError") {
+  if (
+    (err instanceof Error && err.name === "TimeoutError") ||
+    (err instanceof DOMException && err.name === "TimeoutError") ||
+    (err instanceof Error && (err.message === "timed out" || err.message === "timeout")) ||
+    (err instanceof Error &&
+      (err as { cause?: Error | DOMException }).cause?.name === "TimeoutError")
+  ) {
     return {
       code: "upstream-timeout",
       message: `${providerLabel} did not respond in time.`,
