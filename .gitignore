@@ -5,6 +5,7 @@ node_modules/
 dist/
 dist-server/
 *.tsbuildinfo
+worker-configuration.d.ts
 
 # Local tooling / session state
 .mimosa/
