@@ -221,13 +221,18 @@ export function Sidebar({
             onSelectNav("new-chat");
             onNewChat();
           }}
-          title={isCollapsed ? "New Chat" : undefined}
-          className={`w-full flex items-center gap-2.5 h-9 rounded-xl font-semibold text-xs bg-[var(--lime)] text-white hover:opacity-90 transition-all cursor-pointer shadow-sm ${
+          title={isCollapsed ? "New Chat (Ctrl+Shift+O)" : undefined}
+          className={`w-full flex items-center justify-between h-9 rounded-xl font-semibold text-xs bg-[var(--lime)] text-white hover:opacity-90 transition-all cursor-pointer shadow-sm ${
             isCollapsed ? "justify-center px-0" : "px-3"
           }`}
         >
-          <Plus className="w-4 h-4 stroke-[2.4]" />
-          {!isCollapsed && <span>New Conversation</span>}
+          <span className="flex items-center gap-2">
+            <Plus className="w-4 h-4 stroke-[2.4]" />
+            {!isCollapsed && <span>New Conversation</span>}
+          </span>
+          {!isCollapsed && (
+            <span className="text-[10px] opacity-75 font-mono">⌘⇧O</span>
+          )}
         </button>
 
         {/* Quick Nav: Custom Providers & Prompt Library */}
@@ -237,7 +242,7 @@ export function Sidebar({
               onSelectNav("providers");
               onOpenProvidersModal();
             }}
-            title={isCollapsed ? "Custom Providers & Keys" : undefined}
+            title={isCollapsed ? "Custom Providers & Keys (Ctrl+P)" : undefined}
             className={`w-full flex items-center gap-2.5 h-8 rounded-lg text-xs transition-colors cursor-pointer ${
               activeNav === "providers"
                 ? "bg-[var(--active-overlay)] text-[var(--text-primary)] font-semibold"

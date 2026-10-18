@@ -1,12 +1,17 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useAuth, useUser } from "@clerk/react";
 import { Sidebar, type Theme } from "./components/Sidebar";
 import { StudioHeader } from "./components/StudioHeader";
 import { PrimaryWorkspace } from "./components/PrimaryWorkspace";
 import { ViewPanel } from "./components/view/ViewPanel";
-import { ProvidersModal } from "./components/ProvidersModal";
-import { PromptLibraryModal } from "./components/PromptLibraryModal";
+
+const ProvidersModal = lazy(() =>
+  import("./components/ProvidersModal").then((m) => ({ default: m.ProvidersModal })),
+);
+const PromptLibraryModal = lazy(() =>
+  import("./components/PromptLibraryModal").then((m) => ({ default: m.PromptLibraryModal })),
+);
 import type {
   NavItemId,
   ViewType,
@@ -174,6 +179,36 @@ export function App() {
       body.classList.add("light", "theme-light");
     }
   }, [theme]);
+
+  // Global keyboard shortcuts (Ctrl/Cmd+K, Ctrl/Cmd+P, Escape)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        const ta = document.querySelector<HTMLTextAreaElement>("textarea");
+        ta?.focus();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setIsProvidersOpen((prev) => !prev);
+      } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        handleNewChat();
+      } else if (e.key === "Escape") {
+        if (isLoading) {
+          handleCancelStream();
+        } else if (isProvidersOpen) {
+          setIsProvidersOpen(false);
+        } else if (isPromptLibraryOpen) {
+          setIsPromptLibraryOpen(false);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isLoading, isProvidersOpen, isPromptLibraryOpen]);
 
   // Auto-collapse sidebar on narrow screens
   useEffect(() => {
@@ -752,24 +787,32 @@ export function App() {
         </div>
       </div>
 
-      {/* Custom Providers Configuration Modal */}
-      <ProvidersModal
-        isOpen={isProvidersOpen}
-        onClose={() => setIsProvidersOpen(false)}
-        providers={providers}
-        onRefreshProviders={refreshProviders}
-        onRefreshModels={refreshModels}
-        keyStorage={keyStorage}
-      />
+      {/* Custom Providers Configuration Modal (Lazy loaded) */}
+      <Suspense fallback={null}>
+        {isProvidersOpen && (
+          <ProvidersModal
+            isOpen={isProvidersOpen}
+            onClose={() => setIsProvidersOpen(false)}
+            providers={providers}
+            onRefreshProviders={refreshProviders}
+            onRefreshModels={refreshModels}
+            keyStorage={keyStorage}
+          />
+        )}
+      </Suspense>
 
-      {/* Prompt & Benchmark Library Modal */}
-      <PromptLibraryModal
-        isOpen={isPromptLibraryOpen}
-        onClose={() => setIsPromptLibraryOpen(false)}
-        onSelectPrompt={(pr) => {
-          setPrompt(pr);
-        }}
-      />
+      {/* Prompt & Benchmark Library Modal (Lazy loaded) */}
+      <Suspense fallback={null}>
+        {isPromptLibraryOpen && (
+          <PromptLibraryModal
+            isOpen={isPromptLibraryOpen}
+            onClose={() => setIsPromptLibraryOpen(false)}
+            onSelectPrompt={(pr) => {
+              setPrompt(pr);
+            }}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

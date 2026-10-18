@@ -219,6 +219,10 @@ export function Composer({
 
         <div className="flex-1" />
 
+        <span className="hidden lg:inline text-[10px] text-neutral-400 dark:text-neutral-500 font-mono pr-1">
+          Enter ↵ to send · ⌘K
+        </span>
+
         {/* Send or Stop Button */}
         {isStreaming ? (
           <motion.button

@@ -232,10 +232,18 @@ export function ProvidersModal({
     try {
       const res = await testProvider(id);
       if (res.ok) {
+        const ms = res.latencyMs;
+        const speedDesc = ms
+          ? ms < 200
+            ? `⚡ Ultra-fast (${ms}ms)`
+            : ms < 800
+              ? `✓ Connected (${ms}ms)`
+              : `Slow connection (${ms}ms)`
+          : "OK";
         setActionNotice({
           id,
           type: "success",
-          text: `Connection verified! Latency: ${res.latencyMs ? `${res.latencyMs}ms` : "OK"}`,
+          text: `Endpoint verified: ${speedDesc}`,
         });
       } else {
         setActionNotice({
@@ -524,26 +532,54 @@ export function ProvidersModal({
               <form onSubmit={handleSave} className="space-y-5">
                 {/* Quick Presets (Only when adding new) */}
                 {!editingProvider && (
-                  <div>
-                    <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-400 mb-2">
-                      Quick Presets (Click to autofill)
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {QUICK_PRESETS.map((pr) => (
-                        <button
-                          key={pr.label}
-                          type="button"
-                          onClick={() => applyPreset(pr)}
-                          className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
-                            displayName === pr.displayName && baseUrl === pr.baseUrl
-                              ? "border-[var(--lime)] bg-[var(--lime)]/15 text-[var(--lime)] dark:text-[var(--lime-text)] font-semibold"
-                              : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-[#232b24] hover:border-[var(--lime)] text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
-                          }`}
-                        >
-                          <ModelIcon type={pr.kind} className="w-4 h-4 shrink-0" />
-                          <span className="text-xs truncate">{pr.label}</span>
-                        </button>
-                      ))}
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider block mb-1.5">
+                        Local Hosts (No API Key Required)
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        {QUICK_PRESETS.filter((p) => p.isLocal).map((pr) => (
+                          <button
+                            key={pr.label}
+                            type="button"
+                            onClick={() => applyPreset(pr)}
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                              displayName === pr.displayName && baseUrl === pr.baseUrl
+                                ? "border-[var(--lime)] bg-[var(--lime)]/15 text-[var(--lime)] dark:text-[var(--lime-text)] font-semibold shadow-xs"
+                                : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-[#232b24] hover:border-[var(--lime)] text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
+                            }`}
+                          >
+                            <ModelIcon type={pr.kind} className="w-4 h-4 shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold truncate">{pr.label}</div>
+                              <div className="text-[10px] text-neutral-400 font-mono truncate">{pr.baseUrl}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider block mb-1.5">
+                        Cloud AI Providers (BYOK)
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {QUICK_PRESETS.filter((p) => !p.isLocal).map((pr) => (
+                          <button
+                            key={pr.label}
+                            type="button"
+                            onClick={() => applyPreset(pr)}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-left border transition-all cursor-pointer ${
+                              displayName === pr.displayName && baseUrl === pr.baseUrl
+                                ? "border-[var(--lime)] bg-[var(--lime)]/15 text-[var(--lime)] dark:text-[var(--lime-text)] font-semibold shadow-xs"
+                                : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-[#232b24] hover:border-[var(--lime)] text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
+                            }`}
+                          >
+                            <ModelIcon type={pr.kind} className="w-4 h-4 shrink-0" />
+                            <span className="text-xs truncate">{pr.label}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

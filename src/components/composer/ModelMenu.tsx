@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronDown, Search, Star, Plus, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Search, Star, Plus, Sparkles, Eye, Wrench } from "lucide-react";
 import type { ModelWithProvider } from "@shared/types.js";
 import { ModelIcon } from "./icons";
 
@@ -14,6 +14,8 @@ interface ModelMenuProps {
   disabled?: boolean;
 }
 
+type FilterTag = "all" | "fav" | "vision" | "tools";
+
 export function ModelMenu({
   models,
   selectedModel,
@@ -24,6 +26,7 @@ export function ModelMenu({
 }: ModelMenuProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [filterTag, setFilterTag] = useState<FilterTag>("all");
 
   // Find active model object
   const activeModel = useMemo(() => {
@@ -36,17 +39,33 @@ export function ModelMenu({
     );
   }, [models, selectedModel]);
 
-  // Filter models by query
+  // Filter models by query and tag
   const filteredModels = useMemo(() => {
-    if (!query.trim()) return models;
+    let list = models;
+    if (filterTag === "fav") {
+      list = list.filter((m) => m.favourite);
+    } else if (filterTag === "vision") {
+      list = list.filter(
+        (m) =>
+          m.capabilities?.vision === "provider" ||
+          m.capabilities?.vision === "inferred" ||
+          m.capabilities?.inputModalities?.includes("image"),
+      );
+    } else if (filterTag === "tools") {
+      list = list.filter(
+        (m) => m.capabilities?.tools === "provider" || m.capabilities?.tools === "inferred",
+      );
+    }
+
+    if (!query.trim()) return list;
     const q = query.toLowerCase();
-    return models.filter(
+    return list.filter(
       (m) =>
         m.displayName.toLowerCase().includes(q) ||
         m.modelId.toLowerCase().includes(q) ||
         m.provider?.displayName?.toLowerCase().includes(q),
     );
-  }, [models, query]);
+  }, [models, query, filterTag]);
 
   // Group models by provider
   const grouped = useMemo(() => {
@@ -78,7 +97,10 @@ export function ModelMenu({
       onOpenChange={(o) => {
         if (disabled) return;
         setOpen(o);
-        if (!o) setQuery("");
+        if (!o) {
+          setQuery("");
+          setFilterTag("all");
+        }
       }}
     >
       <DropdownMenu.Trigger asChild>
@@ -108,7 +130,7 @@ export function ModelMenu({
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
-          className="w-[320px] max-h-[380px] flex flex-col rounded-xl p-1.5 z-50 border shadow-xl dark:shadow-2xl bg-white dark:bg-[#202721] border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-100 focus:outline-none"
+          className="w-[330px] max-h-[420px] flex flex-col rounded-xl p-1.5 z-50 border shadow-xl dark:shadow-2xl bg-white dark:bg-[#202721] border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-100 focus:outline-none"
         >
           {/* Search bar */}
           <div
@@ -124,6 +146,29 @@ export function ModelMenu({
               placeholder="Search models or providers…"
               className="w-full bg-transparent outline-none text-xs text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500"
             />
+          </div>
+
+          {/* Quick Filter Bar */}
+          <div className="flex items-center gap-1 px-1 mb-1.5 shrink-0">
+            {[
+              { id: "all", label: "All" },
+              { id: "fav", label: "★ Favs" },
+              { id: "vision", label: "Vision" },
+              { id: "tools", label: "Tools" },
+            ].map((tag) => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => setFilterTag(tag.id as FilterTag)}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
+                  filterTag === tag.id
+                    ? "bg-[var(--lime)] text-white"
+                    : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+              >
+                {tag.label}
+              </button>
+            ))}
           </div>
 
           {/* Model Groups */}
@@ -167,6 +212,12 @@ export function ModelMenu({
                       activeModel?.providerId === m.providerId &&
                       activeModel?.modelId === m.modelId;
                     const ctx = formatContext(m.contextWindow);
+                    const hasVision =
+                      m.capabilities?.vision === "provider" ||
+                      m.capabilities?.vision === "inferred" ||
+                      m.capabilities?.inputModalities?.includes("image");
+                    const hasTools =
+                      m.capabilities?.tools === "provider" || m.capabilities?.tools === "inferred";
 
                     return (
                       <div
@@ -198,6 +249,16 @@ export function ModelMenu({
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {hasVision && (
+                            <span title="Supports Vision / Images">
+                              <Eye className="w-3 h-3 text-sky-400" />
+                            </span>
+                          )}
+                          {hasTools && (
+                            <span title="Supports Function Calling / Tools">
+                              <Wrench className="w-3 h-3 text-purple-400" />
+                            </span>
+                          )}
                           {ctx && (
                             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-neutral-200/80 dark:bg-black/40 text-neutral-600 dark:text-neutral-400">
                               {ctx}

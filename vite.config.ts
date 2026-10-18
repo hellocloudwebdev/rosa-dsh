@@ -58,8 +58,17 @@ export default defineConfig({
             ) {
               return "markdown";
             }
-            if (id.includes("react") || id.includes("scheduler")) {
-              return "react";
+            if (id.includes("@clerk")) {
+              return "clerk";
+            }
+            if (id.includes("@radix-ui")) {
+              return "radix-ui";
+            }
+            if (id.includes("lucide-react")) {
+              return "icons";
+            }
+            if (id.includes("react") || id.includes("scheduler") || id.includes("framer-motion")) {
+              return "react-vendor";
             }
           }
           return undefined;
