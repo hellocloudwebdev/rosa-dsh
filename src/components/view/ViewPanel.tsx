@@ -99,7 +99,7 @@ export function ViewPanel({
             <DropdownMenu.Content
               align="start"
               sideOffset={6}
-              className="w-52 bg-[var(--bg-panel-2)] rounded-xl p-1.5 border border-[var(--border-strong)] shadow-2xl z-50 focus:outline-none"
+              className="w-52 bg-white dark:bg-[#202721] text-neutral-900 dark:text-neutral-100 rounded-xl p-1.5 border border-neutral-200 dark:border-white/10 shadow-xl dark:shadow-2xl z-50 focus:outline-none"
             >
               {VIEW_LIST.map((v) => (
                 <DropdownMenu.Item
@@ -107,8 +107,8 @@ export function ViewPanel({
                   onSelect={() => onTypeChange(v.type)}
                   className={`flex items-center justify-between px-2.5 py-2 text-xs rounded-lg cursor-pointer outline-none transition-colors ${
                     v.type === viewType
-                      ? "bg-[var(--active-overlay)] text-[var(--text-primary)] font-semibold"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]"
+                      ? "bg-neutral-100 dark:bg-white/10 text-neutral-900 dark:text-white font-semibold"
+                      : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white"
                   }`}
                 >
                   <span className="flex items-center gap-2.5">

@@ -160,6 +160,19 @@ export function App() {
     } catch {
       /* ignore */
     }
+    const root = document.documentElement;
+    const body = document.body;
+    if (theme === "dark") {
+      root.classList.remove("light", "theme-light");
+      root.classList.add("dark", "theme-dark");
+      body.classList.remove("light", "theme-light");
+      body.classList.add("dark", "theme-dark");
+    } else {
+      root.classList.remove("dark", "theme-dark");
+      root.classList.add("light", "theme-light");
+      body.classList.remove("dark", "theme-dark");
+      body.classList.add("light", "theme-light");
+    }
   }, [theme]);
 
   // Auto-collapse sidebar on narrow screens

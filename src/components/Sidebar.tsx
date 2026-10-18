@@ -190,9 +190,9 @@ export function Sidebar({
                 <DropdownMenu.Content
                   align="start"
                   sideOffset={6}
-                  className="w-56 bg-[var(--bg-panel-2)] rounded-xl p-1.5 border border-[var(--border-strong)] shadow-2xl z-50 focus:outline-none"
+                  className="w-56 bg-white dark:bg-[#202721] text-neutral-900 dark:text-neutral-100 rounded-xl p-1.5 border border-neutral-200 dark:border-white/10 shadow-xl dark:shadow-2xl z-50 focus:outline-none"
                 >
-                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                     Workspace Filter
                   </div>
                   {WORKSPACE_MODES.map((ws) => (
@@ -201,8 +201,8 @@ export function Sidebar({
                       onSelect={() => setWorkspace(ws.name)}
                       className={`flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg cursor-pointer outline-none transition-colors ${
                         workspace === ws.name
-                          ? "bg-[var(--active-overlay)] text-[var(--text-primary)] font-semibold"
-                          : "text-[var(--text-secondary)] hover:bg-[var(--hover-overlay)]"
+                          ? "bg-neutral-100 dark:bg-white/10 text-neutral-900 dark:text-white font-semibold"
+                          : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white"
                       }`}
                     >
                       <span>{ws.name}</span>
@@ -550,26 +550,26 @@ function ConversationItem({
             <DropdownMenu.Content
               align="end"
               sideOffset={4}
-              className="w-36 bg-[var(--bg-panel-2)] border border-[var(--border-strong)] rounded-xl p-1 shadow-xl z-50 text-xs focus:outline-none"
+              className="w-36 bg-white dark:bg-[#202721] text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-white/10 rounded-xl p-1 shadow-xl dark:shadow-2xl z-50 text-xs focus:outline-none"
             >
               <DropdownMenu.Item
                 onSelect={startRename}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)] cursor-pointer outline-none"
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer outline-none"
               >
                 <Edit2 className="w-3 h-3" />
                 <span>Rename</span>
               </DropdownMenu.Item>
               <DropdownMenu.Item
                 onSelect={onTogglePin}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)] cursor-pointer outline-none"
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer outline-none"
               >
                 <Pin className="w-3 h-3" />
                 <span>{conv.pinned ? "Unpin" : "Pin"}</span>
               </DropdownMenu.Item>
-              <DropdownMenu.Separator className="h-px bg-white/5 my-0.5" />
+              <DropdownMenu.Separator className="h-px bg-neutral-200 dark:bg-white/5 my-0.5" />
               <DropdownMenu.Item
                 onSelect={onDelete}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 cursor-pointer outline-none"
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 cursor-pointer outline-none"
               >
                 <Trash2 className="w-3 h-3" />
                 <span>Delete</span>

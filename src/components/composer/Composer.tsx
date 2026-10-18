@@ -192,7 +192,7 @@ export function Composer({
               <Popover.Content
                 align="center"
                 sideOffset={8}
-                className="w-64 rounded-xl p-3 z-50 border shadow-2xl bg-[var(--bg-panel)] border-[var(--border-strong)] text-[var(--text-primary)] focus:outline-none"
+                className="w-64 rounded-xl p-3 z-50 border shadow-2xl bg-white dark:bg-[#202721] border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-100 focus:outline-none"
               >
                 <div className="text-xs font-semibold mb-2 flex items-center justify-between">
                   <span>Temperature (Creativity)</span>

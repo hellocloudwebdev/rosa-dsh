@@ -20,13 +20,10 @@ export function ModelMenu({
   onSelectModel,
   onOpenProvidersModal,
   onToggleFavourite,
-  variant = "dark",
   disabled = false,
 }: ModelMenuProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-
-  const isLight = variant === "light";
 
   // Find active model object
   const activeModel = useMemo(() => {
@@ -88,11 +85,7 @@ export function ModelMenu({
         <button
           type="button"
           disabled={disabled}
-          className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium cursor-pointer outline-none transition-colors border ${
-            isLight
-              ? "bg-white hover:bg-neutral-50 border-neutral-200 text-neutral-800"
-              : "bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] border-[var(--border-strong)] text-[var(--text-primary)]"
-          } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium cursor-pointer outline-none transition-colors border bg-white dark:bg-[#283129] hover:bg-neutral-50 dark:hover:bg-[#323d33] border-neutral-200 dark:border-white/10 text-neutral-800 dark:text-neutral-100 ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           {activeModel ? (
             <>
@@ -115,19 +108,11 @@ export function ModelMenu({
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
-          className={`w-[320px] max-h-[380px] flex flex-col rounded-xl p-1.5 z-50 border shadow-2xl focus:outline-none ${
-            isLight
-              ? "bg-white border-neutral-200 text-neutral-900"
-              : "bg-[#242b25] border-white/10 text-neutral-100"
-          }`}
+          className="w-[320px] max-h-[380px] flex flex-col rounded-xl p-1.5 z-50 border shadow-xl dark:shadow-2xl bg-white dark:bg-[#202721] border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-100 focus:outline-none"
         >
           {/* Search bar */}
           <div
-            className={`flex items-center gap-2 rounded-lg px-2.5 h-8 mb-1.5 shrink-0 border ${
-              isLight
-                ? "bg-neutral-100 border-neutral-200"
-                : "bg-black/20 border-white/5"
-            }`}
+            className="flex items-center gap-2 rounded-lg px-2.5 h-8 mb-1.5 shrink-0 border bg-neutral-100 dark:bg-black/30 border-neutral-200 dark:border-white/5"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
@@ -137,7 +122,7 @@ export function ModelMenu({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search models or providers…"
-              className="w-full bg-transparent outline-none text-xs"
+              className="w-full bg-transparent outline-none text-xs text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500"
             />
           </div>
 
@@ -145,7 +130,7 @@ export function ModelMenu({
           <div className="flex-1 overflow-y-auto space-y-2 pr-0.5">
             {models.length === 0 ? (
               <div className="p-4 text-center">
-                <p className="text-xs text-neutral-400 mb-3">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
                   No models discovered yet. Add a provider or local Ollama endpoint to begin.
                 </p>
                 <button
@@ -154,20 +139,20 @@ export function ModelMenu({
                     setOpen(false);
                     onOpenProvidersModal();
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold bg-[var(--lime)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold bg-[var(--lime)] text-white hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Configure Providers</span>
                 </button>
               </div>
             ) : filteredModels.length === 0 ? (
-              <div className="py-6 text-center text-xs text-neutral-400">
+              <div className="py-6 text-center text-xs text-neutral-500 dark:text-neutral-400">
                 No matching models found.
               </div>
             ) : (
               grouped.map((group) => (
                 <div key={group.providerName} className="space-y-0.5">
-                  <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 flex items-center justify-between">
+                  <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <ModelIcon type={group.providerKind} className="w-3 h-3" />
                       <span>{group.providerName}</span>
@@ -196,12 +181,8 @@ export function ModelMenu({
                         }}
                         className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors group ${
                           isSelected
-                            ? isLight
-                              ? "bg-neutral-100 text-neutral-900 font-medium"
-                              : "bg-white/10 text-white font-medium"
-                            : isLight
-                              ? "text-neutral-700 hover:bg-neutral-50"
-                              : "text-neutral-300 hover:bg-white/5"
+                            ? "bg-neutral-100 dark:bg-white/10 text-neutral-900 dark:text-white font-semibold"
+                            : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white"
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -209,7 +190,7 @@ export function ModelMenu({
                           <div className="min-w-0 flex flex-col">
                             <span className="truncate font-medium">{m.displayName || m.modelId}</span>
                             {m.description && (
-                              <span className="text-[10px] text-neutral-400 truncate max-w-[190px]">
+                              <span className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate max-w-[190px]">
                                 {m.description}
                               </span>
                             )}
@@ -218,7 +199,7 @@ export function ModelMenu({
 
                         <div className="flex items-center gap-1.5 shrink-0">
                           {ctx && (
-                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/20 text-neutral-400">
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-neutral-200/80 dark:bg-black/40 text-neutral-600 dark:text-neutral-400">
                               {ctx}
                             </span>
                           )}
@@ -232,8 +213,8 @@ export function ModelMenu({
                               }}
                               className={`p-0.5 rounded transition-colors ${
                                 m.favourite
-                                  ? "text-amber-400"
-                                  : "text-neutral-500 opacity-0 group-hover:opacity-100 hover:text-amber-400"
+                                  ? "text-amber-500"
+                                  : "text-neutral-400 opacity-0 group-hover:opacity-100 hover:text-amber-500"
                               }`}
                               title={m.favourite ? "Remove from favourites" : "Add to favourites"}
                             >
@@ -242,7 +223,7 @@ export function ModelMenu({
                           )}
 
                           {isSelected && (
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                           )}
                         </div>
                       </div>
@@ -254,14 +235,14 @@ export function ModelMenu({
           </div>
 
           {/* Footer: Manage Providers button */}
-          <div className="pt-1.5 mt-1 border-t border-white/5 shrink-0">
+          <div className="pt-1.5 mt-1 border-t border-neutral-200 dark:border-white/10 shrink-0">
             <button
               type="button"
               onClick={() => {
                 setOpen(false);
                 onOpenProvidersModal();
               }}
-              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs text-neutral-300 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             >
               <Plus className="w-3 h-3" />
               <span>Manage Custom Providers & Keys</span>

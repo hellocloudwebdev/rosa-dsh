@@ -293,22 +293,22 @@ export function ProvidersModal({
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[94vw] max-w-2xl max-h-[88vh] bg-[var(--bg-panel)] border border-[var(--border-strong)] rounded-2xl shadow-2xl z-50 flex flex-col text-[var(--text-primary)] overflow-hidden focus:outline-none">
+        <Dialog.Overlay className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 transition-opacity" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[94vw] max-w-2xl max-h-[88vh] bg-white dark:bg-[#1a201b] text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden focus:outline-none">
           {/* Header */}
-          <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
+          <div className="px-6 py-4 border-b border-neutral-200 dark:border-white/10 flex items-center justify-between shrink-0 bg-neutral-50/50 dark:bg-transparent">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-[var(--lime)]/15 border border-[var(--lime)]/30 text-[var(--lime-text)] flex items-center justify-center">
                 <Server className="w-5 h-5" />
               </div>
               <div>
-                <Dialog.Title className="text-base font-semibold tracking-tight">
+                <Dialog.Title className="text-base font-semibold tracking-tight text-neutral-900 dark:text-white">
                   Custom AI Providers & Endpoints
                 </Dialog.Title>
-                <Dialog.Description className="text-xs text-[var(--text-muted)] flex items-center gap-2 mt-0.5">
+                <Dialog.Description className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-2 mt-0.5">
                   <span>BYOK — Connect OpenAI, Anthropic, Ollama, DeepSeek & more</span>
-                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.2 rounded bg-black/20 text-[var(--text-secondary)]">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.2 rounded bg-neutral-200/80 dark:bg-black/30 text-neutral-700 dark:text-neutral-300">
+                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
                     {keyStorage === "encrypted-server-side"
                       ? "AES-GCM Encrypted"
                       : "Session Only"}
@@ -321,7 +321,7 @@ export function ProvidersModal({
               {view === "list" && (
                 <button
                   onClick={openAddForm}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--lime)] text-white hover:opacity-90 rounded-lg transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--lime)] text-white hover:opacity-90 rounded-lg transition-colors cursor-pointer shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Provider</span>
@@ -329,7 +329,7 @@ export function ProvidersModal({
               )}
               <Dialog.Close asChild>
                 <button
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)] transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
                   aria-label="Close"
                 >
                   <X className="w-4 h-4" />
@@ -339,11 +339,11 @@ export function ProvidersModal({
           </div>
 
           {/* Modal Body */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-[#1a201b]">
             {view === "list" ? (
               <div className="space-y-4">
                 {/* Providers count and quick status */}
-                <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] pb-1">
+                <div className="flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-400 pb-1">
                   <span>
                     Configured Endpoints ({providers.length})
                   </span>
@@ -352,7 +352,7 @@ export function ProvidersModal({
                       onRefreshProviders();
                       onRefreshModels();
                     }}
-                    className="flex items-center gap-1 hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                    className="flex items-center gap-1 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
                   >
                     <RefreshCw className="w-3 h-3" />
                     <span>Refresh</span>
@@ -360,17 +360,17 @@ export function ProvidersModal({
                 </div>
 
                 {providers.length === 0 ? (
-                  <div className="text-center py-12 px-4 border border-dashed border-[var(--border-strong)] rounded-xl bg-[var(--bg-panel-2)]/50">
-                    <Radio className="w-10 h-10 mx-auto text-[var(--text-muted)] mb-3 opacity-60" />
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                  <div className="text-center py-12 px-4 border border-dashed border-neutral-300 dark:border-white/15 rounded-xl bg-neutral-50 dark:bg-[#202721]">
+                    <Radio className="w-10 h-10 mx-auto text-neutral-400 dark:text-neutral-500 mb-3 opacity-60" />
+                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-1">
                       No custom providers configured yet
                     </h3>
-                    <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto mb-5 leading-relaxed">
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 max-w-md mx-auto mb-5 leading-relaxed">
                       Connect your OpenAI, Anthropic, or local Ollama / LM Studio endpoints. Rosa works with any standard or OpenAI-compatible LLM host.
                     </p>
                     <button
                       onClick={openAddForm}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[var(--lime)] text-white rounded-lg hover:opacity-90 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[var(--lime)] text-white rounded-lg hover:opacity-90 transition-colors cursor-pointer shadow-xs"
                     >
                       <Plus className="w-4 h-4" />
                       <span>Add Your First Provider</span>
@@ -386,23 +386,23 @@ export function ProvidersModal({
                       return (
                         <div
                           key={p.id}
-                          className="p-4 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:border-[var(--lime)]/40 transition-all flex flex-col gap-3"
+                          className="p-4 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50/80 dark:bg-[#232b24] hover:border-[var(--lime)] transition-all flex flex-col gap-3 shadow-xs"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-[var(--hover-overlay)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+                              <div className="w-8 h-8 rounded-lg bg-white dark:bg-black/20 border border-neutral-200 dark:border-white/10 flex items-center justify-center shrink-0">
                                 <ModelIcon type={p.kind} className="w-4 h-4" />
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <h4 className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                                  <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
                                     {p.displayName}
                                   </h4>
-                                  <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-black/20 text-[var(--text-muted)] shrink-0">
+                                  <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-neutral-200/80 dark:bg-black/30 text-neutral-600 dark:text-neutral-400 shrink-0">
                                     {p.kind}
                                   </span>
                                 </div>
-                                <p className="text-xs text-[var(--text-muted)] font-mono truncate mt-0.5">
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400 font-mono truncate mt-0.5">
                                   {p.baseUrl}
                                 </p>
                               </div>
@@ -411,17 +411,17 @@ export function ProvidersModal({
                             {/* Status badge */}
                             <div className="flex items-center gap-2 shrink-0">
                               {p.connectionStatus === "ok" ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                   Connected
                                 </span>
                               ) : p.connectionStatus === "error" ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
                                   <AlertCircle className="w-3 h-3" />
                                   Error
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--text-muted)] bg-[var(--hover-overlay)] px-2 py-0.5 rounded-full">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-500 bg-neutral-200/60 dark:bg-white/5 px-2 py-0.5 rounded-full">
                                   Untested
                                 </span>
                               )}
@@ -429,8 +429,8 @@ export function ProvidersModal({
                           </div>
 
                           {/* Chips row: Key hint & Model count */}
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-secondary)] border-t border-[var(--border-subtle)] pt-2.5">
-                            <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-600 dark:text-neutral-400 border-t border-neutral-200 dark:border-white/10 pt-2.5">
+                            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
                               <KeyRound className="w-3.5 h-3.5" />
                               <span>
                                 {p.hasApiKey
@@ -439,7 +439,7 @@ export function ProvidersModal({
                               </span>
                             </div>
 
-                            <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
                               <Sparkles className="w-3.5 h-3.5 text-[var(--lime-text)]" />
                               <span>
                                 {p.modelCount !== null ? `${p.modelCount} models discovered` : "0 models"}
@@ -453,13 +453,13 @@ export function ProvidersModal({
                               <button
                                 onClick={() => handleTest(p.id)}
                                 disabled={isTesting}
-                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-[var(--border-strong)] bg-[var(--hover-overlay)] hover:bg-[var(--active-overlay)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-50"
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer disabled:opacity-50"
                                 title="Verify connectivity and response latency"
                               >
                                 {isTesting ? (
-                                  <RefreshCw className="w-3 h-3 animate-spin text-[var(--lime-text)]" />
+                                  <RefreshCw className="w-3 h-3 animate-spin text-[var(--lime)]" />
                                 ) : (
-                                  <Zap className="w-3 h-3 text-amber-400" />
+                                  <Zap className="w-3 h-3 text-amber-500" />
                                 )}
                                 <span>{isTesting ? "Testing…" : "Test Ping"}</span>
                               </button>
@@ -467,11 +467,11 @@ export function ProvidersModal({
                               <button
                                 onClick={() => handleDiscover(p.id)}
                                 disabled={isDiscovering}
-                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-[var(--border-strong)] bg-[var(--hover-overlay)] hover:bg-[var(--active-overlay)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-50"
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer disabled:opacity-50"
                                 title="Discover available models from this endpoint"
                               >
                                 {isDiscovering ? (
-                                  <RefreshCw className="w-3 h-3 animate-spin text-[var(--lime-text)]" />
+                                  <RefreshCw className="w-3 h-3 animate-spin text-[var(--lime)]" />
                                 ) : (
                                   <RefreshCw className="w-3 h-3" />
                                 )}
@@ -480,7 +480,7 @@ export function ProvidersModal({
 
                               <button
                                 onClick={() => openEditForm(p)}
-                                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)] transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
                                 title="Edit Provider"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
@@ -488,7 +488,7 @@ export function ProvidersModal({
 
                               <button
                                 onClick={() => handleDelete(p.id, p.displayName)}
-                                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
                                 title="Delete Provider"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -501,8 +501,8 @@ export function ProvidersModal({
                             <div
                               className={`text-xs px-3 py-1.5 rounded-lg flex items-center gap-2 ${
                                 notice.type === "success"
-                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                  : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
                               }`}
                             >
                               {notice.type === "success" ? (
@@ -525,7 +525,7 @@ export function ProvidersModal({
                 {/* Quick Presets (Only when adding new) */}
                 {!editingProvider && (
                   <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+                    <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-400 mb-2">
                       Quick Presets (Click to autofill)
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -536,8 +536,8 @@ export function ProvidersModal({
                           onClick={() => applyPreset(pr)}
                           className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-left border transition-all cursor-pointer ${
                             displayName === pr.displayName && baseUrl === pr.baseUrl
-                              ? "border-[var(--lime)] bg-[var(--lime)]/15 text-[var(--lime-text)] font-semibold"
-                              : "border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:border-[var(--lime)]/40 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                              ? "border-[var(--lime)] bg-[var(--lime)]/15 text-[var(--lime)] dark:text-[var(--lime-text)] font-semibold"
+                              : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-[#232b24] hover:border-[var(--lime)] text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
                           }`}
                         >
                           <ModelIcon type={pr.kind} className="w-4 h-4 shrink-0" />
@@ -551,7 +551,7 @@ export function ProvidersModal({
                 {/* Form fields */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                       Provider Kind
                     </label>
                     <select
@@ -565,7 +565,7 @@ export function ProvidersModal({
                         }
                       }}
                       disabled={Boolean(editingProvider)}
-                      className="w-full bg-[var(--bg-panel-2)] border border-[var(--border-strong)] rounded-xl px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--lime)] transition-colors cursor-pointer disabled:opacity-60"
+                      className="w-full bg-white dark:bg-[#202721] border border-neutral-300 dark:border-white/15 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 outline-none focus:border-[var(--lime)] transition-colors cursor-pointer disabled:opacity-60"
                     >
                       <option value="openai-compatible">Custom OpenAI-compatible (Ollama / vLLM / LM Studio / DeepSeek)</option>
                       <option value="openai">OpenAI Official</option>
@@ -580,8 +580,8 @@ export function ProvidersModal({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                      Display Name <span className="text-rose-400">*</span>
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                      Display Name <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -589,13 +589,13 @@ export function ProvidersModal({
                       onChange={(e) => setDisplayName(e.target.value)}
                       placeholder="e.g. Ollama Local or Production Claude"
                       required
-                      className="w-full bg-[var(--bg-panel-2)] border border-[var(--border-strong)] rounded-xl px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--lime)] transition-colors"
+                      className="w-full bg-white dark:bg-[#202721] border border-neutral-300 dark:border-white/15 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 outline-none focus:border-[var(--lime)] transition-colors"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                      Base URL <span className="text-rose-400">*</span>
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                      Base URL <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="url"
@@ -603,15 +603,15 @@ export function ProvidersModal({
                       onChange={(e) => setBaseUrl(e.target.value)}
                       placeholder="https://api.openai.com/v1 or http://localhost:11434/v1"
                       required
-                      className="w-full bg-[var(--bg-panel-2)] border border-[var(--border-strong)] rounded-xl px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--lime)] transition-colors"
+                      className="w-full bg-white dark:bg-[#202721] border border-neutral-300 dark:border-white/15 rounded-xl px-3 py-2 text-sm font-mono text-neutral-900 dark:text-neutral-100 outline-none focus:border-[var(--lime)] transition-colors"
                     />
-                    <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
                       Local loopback addresses (http://localhost:11434/v1, http://127.0.0.1:1234/v1) are supported.
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                       API Key {kind === "openai-compatible" && baseUrl.includes("localhost") ? "(Optional for local Ollama)" : "(Required for cloud providers)"}
                     </label>
                     <div className="relative">
@@ -624,25 +624,25 @@ export function ProvidersModal({
                             ? `Keep existing key (••••••••${editingProvider.apiKeyHint || ""})`
                             : "sk-... or x-api-key..."
                         }
-                        className="w-full bg-[var(--bg-panel-2)] border border-[var(--border-strong)] rounded-xl px-3 py-2 pr-10 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--lime)] transition-colors"
+                        className="w-full bg-white dark:bg-[#202721] border border-neutral-300 dark:border-white/15 rounded-xl px-3 py-2 pr-10 text-sm font-mono text-neutral-900 dark:text-neutral-100 outline-none focus:border-[var(--lime)] transition-colors"
                       />
                       <button
                         type="button"
                         onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 dark:hover:text-white cursor-pointer"
                         aria-label={showApiKey ? "Hide API key" : "Show API key"}
                       >
                         {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
                       Keys are encrypted server-side using AES-GCM and never returned in plaintext to the browser.
                     </p>
                   </div>
 
                   {(kind === "openai" || kind === "openai-compatible") && (
                     <div>
-                      <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                      <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                         Organization ID (Optional)
                       </label>
                       <input
@@ -650,7 +650,7 @@ export function ProvidersModal({
                         value={organizationId}
                         onChange={(e) => setOrganizationId(e.target.value)}
                         placeholder="org-..."
-                        className="w-full bg-[var(--bg-panel-2)] border border-[var(--border-strong)] rounded-xl px-3 py-2 text-sm font-mono text-[var(--text-primary)] outline-none focus:border-[var(--lime)] transition-colors"
+                        className="w-full bg-white dark:bg-[#202721] border border-neutral-300 dark:border-white/15 rounded-xl px-3 py-2 text-sm font-mono text-neutral-900 dark:text-neutral-100 outline-none focus:border-[var(--lime)] transition-colors"
                       />
                     </div>
                   )}
@@ -658,28 +658,28 @@ export function ProvidersModal({
 
                 {/* Form Error */}
                 {formError && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{formError}</span>
                   </div>
                 )}
 
                 {/* Submit row */}
-                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--border-subtle)]">
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-200 dark:border-white/10">
                   <button
                     type="button"
                     onClick={() => {
                       setView("list");
                       resetForm();
                     }}
-                    className="px-4 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)] rounded-xl transition-colors cursor-pointer"
+                    className="px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold bg-[var(--lime)] text-white hover:opacity-90 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold bg-[var(--lime)] text-white hover:opacity-90 rounded-xl transition-all cursor-pointer disabled:opacity-50 shadow-xs"
                   >
                     {isSubmitting ? (
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />

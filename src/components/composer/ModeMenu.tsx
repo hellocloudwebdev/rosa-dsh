@@ -23,8 +23,7 @@ interface ModeMenuProps {
   variant?: "dark" | "light";
 }
 
-export function ModeMenu({ mode, onChange, variant = "dark" }: ModeMenuProps) {
-  const isLight = variant === "light";
+export function ModeMenu({ mode, onChange }: ModeMenuProps) {
   const active = MODES.find((m) => m.id === mode) || MODES[0]!;
   const Icon = active.icon;
 
@@ -33,11 +32,7 @@ export function ModeMenu({ mode, onChange, variant = "dark" }: ModeMenuProps) {
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium cursor-pointer outline-none transition-colors border ${
-            isLight
-              ? "bg-white hover:bg-neutral-50 border-neutral-200 text-neutral-800"
-              : "bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] border-[var(--border-strong)] text-[var(--text-primary)]"
-          }`}
+          className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium cursor-pointer outline-none transition-colors border bg-white dark:bg-[#283129] hover:bg-neutral-50 dark:hover:bg-[#323d33] border-neutral-200 dark:border-white/10 text-neutral-800 dark:text-neutral-100"
         >
           <Icon className="w-3.5 h-3.5 text-[var(--lime-text)]" />
           <span>{active.label}</span>
@@ -49,11 +44,7 @@ export function ModeMenu({ mode, onChange, variant = "dark" }: ModeMenuProps) {
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
-          className={`w-[220px] rounded-xl p-1.5 z-50 border shadow-2xl focus:outline-none ${
-            isLight
-              ? "bg-white border-neutral-200 text-neutral-900"
-              : "bg-[#242b25] border-white/10 text-neutral-100"
-          }`}
+          className="w-[220px] rounded-xl p-1.5 z-50 border shadow-xl dark:shadow-2xl bg-white dark:bg-[#202721] border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-100 focus:outline-none"
         >
           {MODES.map((m) => {
             const MIcon = m.icon;
@@ -64,22 +55,18 @@ export function ModeMenu({ mode, onChange, variant = "dark" }: ModeMenuProps) {
                 onSelect={() => onChange(m.id)}
                 className={`flex items-center justify-between px-2.5 py-2 rounded-lg text-xs cursor-pointer outline-none transition-colors ${
                   isSelected
-                    ? isLight
-                      ? "bg-neutral-100 font-medium text-neutral-900"
-                      : "bg-white/10 font-medium text-white"
-                    : isLight
-                      ? "text-neutral-700 hover:bg-neutral-50"
-                      : "text-neutral-300 hover:bg-white/5"
+                    ? "bg-neutral-100 dark:bg-white/10 font-semibold text-neutral-900 dark:text-white"
+                    : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
                 <div className="flex items-center gap-2">
                   <MIcon className="w-3.5 h-3.5 text-[var(--lime-text)]" />
                   <div>
                     <div className="font-medium">{m.label}</div>
-                    <div className="text-[10px] text-neutral-400">{m.desc}</div>
+                    <div className="text-[10px] text-neutral-500 dark:text-neutral-400">{m.desc}</div>
                   </div>
                 </div>
-                {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                {isSelected && <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />}
               </DropdownMenu.Item>
             );
           })}
