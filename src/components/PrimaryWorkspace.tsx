@@ -11,7 +11,6 @@ import {
   Code2,
   Terminal,
   ArrowDown,
-  Trophy,
 } from "lucide-react";
 import type { ModelWithProvider } from "@shared/types.js";
 import { Composer } from "./composer/Composer";
@@ -21,6 +20,7 @@ import type { Msg, ChatPane } from "../types";
 import { ModelIcon } from "./composer/icons";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { ModelMenu } from "./composer/ModelMenu";
+import { ComparisonPane } from "./ComparisonPane";
 
 interface PrimaryWorkspaceProps {
   messages: Msg[];
@@ -134,7 +134,7 @@ export function PrimaryWorkspace({
       const el = listRef.current;
       if (el) el.scrollTop = el.scrollHeight;
     }
-  }, [messages, isLoading, panes, isUserScrolledUp]);
+  }, [messages, isLoading, isUserScrolledUp]);
 
   const copyText = (id: string | number, text: string) => {
     navigator.clipboard.writeText(text);
@@ -320,80 +320,13 @@ export function PrimaryWorkspace({
                     const isMaxSpeed = maxSpeed != null && pane.metrics?.tokensPerSecond === maxSpeed;
 
                     return (
-                      <div
+                      <ComparisonPane
                         key={pane.id}
-                        className={`rounded-2xl border bg-[var(--bg-panel-2)] p-4 shadow-md flex flex-col justify-between transition-all ${
-                          isFastestTtft || isMaxSpeed
-                            ? "border-[var(--lime)] shadow-sm"
-                            : "border-[var(--border-strong)]"
-                        }`}
-                      >
-                        {/* Header */}
-                        <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--border-subtle)] text-xs">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <ModelIcon type={pane.modelId} className="w-3.5 h-3.5 shrink-0" />
-                            <span className="font-semibold text-[var(--text-primary)] truncate max-w-[130px]">
-                              #{idx + 1} · {pane.modelLabel}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isFastestTtft && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20">
-                                <Trophy className="w-2.5 h-2.5" />
-                                <span>Fastest TTFT</span>
-                              </span>
-                            )}
-                            {isMaxSpeed && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-full border border-amber-500/20">
-                                <Zap className="w-2.5 h-2.5" />
-                                <span>Max Speed</span>
-                              </span>
-                            )}
-                            {pane.streaming ? (
-                              <span className="text-[10px] text-[var(--lime-text)] animate-pulse flex items-center gap-1 font-mono">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--lime-text)]" />
-                                Streaming…
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-neutral-400 font-mono">Ready</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-h-[120px] text-sm">
-                          {pane.streamingContent ? (
-                            <>
-                              <MarkdownMessage content={pane.streamingContent} />
-                              {pane.streaming && (
-                                <span className="inline-block w-1.5 h-4 ml-1 bg-[var(--lime-text)] animate-pulse align-middle" />
-                              )}
-                            </>
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-xs text-[var(--text-muted)] animate-pulse">
-                              Waiting for tokens…
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Live metrics footer */}
-                        {pane.metrics && (
-                          <div className="mt-3 pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[10px] font-mono text-[var(--text-muted)]">
-                            <span className={isMaxSpeed ? "text-amber-500 font-semibold" : ""}>
-                              {pane.metrics.tokensPerSecond
-                                ? `${pane.metrics.tokensPerSecond.toFixed(1)} tok/s`
-                                : "—"}
-                            </span>
-                            <span className={isFastestTtft ? "text-emerald-500 font-semibold" : ""}>
-                              {pane.metrics.ttftMs ? `${pane.metrics.ttftMs}ms` : "—"}
-                            </span>
-                            <span>
-                              {pane.metrics.outputTokens ? `${pane.metrics.outputTokens} tok` : ""}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                        pane={pane}
+                        index={idx}
+                        isFastestTtft={isFastestTtft}
+                        isMaxSpeed={isMaxSpeed}
+                      />
                     );
                   })}
                 </div>
