@@ -11,6 +11,7 @@ import {
   Code2,
   Terminal,
   ArrowDown,
+  Key,
 } from "lucide-react";
 import type { ModelWithProvider } from "@shared/types.js";
 import { Composer } from "./composer/Composer";
@@ -170,6 +171,33 @@ export function PrimaryWorkspace({
               <p className="text-sm text-[var(--text-secondary)] mb-8 leading-relaxed">
                 Connect your custom API keys or local Ollama endpoints. Chat with single models or compare multiple providers side-by-side with real metrics.
               </p>
+
+              {/* Direct CTA when no models configured */}
+              {models.length === 0 && (
+                <div
+                  data-testid="no-models-cta-card"
+                  className="mb-8 flex flex-col items-center justify-center p-6 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-panel-2)] shadow-sm"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-[var(--lime)]/10 text-[var(--lime-text)] flex items-center justify-center mb-3">
+                    <Key className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                    No models configured
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)] max-w-sm mb-4">
+                    Connect an API provider or enter a key to start chatting and comparing models.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onOpenProvidersModal}
+                    data-testid="configure-provider-cta"
+                    className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--lime)]/40 bg-[var(--lime)] text-white hover:opacity-90 flex items-center gap-2 shadow-sm transition-all cursor-pointer font-medium"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    <span>Configure Provider & API Key</span>
+                  </button>
+                </div>
+              )}
 
               {/* Suggestions Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
