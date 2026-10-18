@@ -98,9 +98,15 @@ export function ComparisonPane({
               <span className="inline-block w-1.5 h-4 ml-1 bg-[var(--lime-text)] animate-pulse align-middle" />
             )}
           </>
-        ) : (
+        ) : !pane.error ? (
           <div className="flex items-center justify-center h-full text-xs text-[var(--text-muted)] animate-pulse">
             Waiting for tokens…
+          </div>
+        ) : null}
+
+        {pane.error && (
+          <div className="mt-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+            {pane.error}
           </div>
         )}
       </div>

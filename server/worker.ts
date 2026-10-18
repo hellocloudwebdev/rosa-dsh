@@ -69,7 +69,7 @@ function ensureSchema(driver: D1Driver, env: WorkerEnv): Promise<void> {
 function jsonError(status: number, message: string, detail?: string): Response {
   return new Response(
     JSON.stringify({
-      error: { code: "upstream-unavailable", message, detail, retryable: false },
+      error: { code: "server-error", message, detail, retryable: false },
     }),
     {
       status,

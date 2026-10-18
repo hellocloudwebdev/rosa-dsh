@@ -129,7 +129,7 @@ export abstract class BaseAdapter implements ProviderAdapter {
       emit({
         type: "error",
         error: {
-          code: "unsupported",
+          code: "bad-response",
           message: `${ctx.providerLabel} returned an empty response body.`,
           retryable: false,
         },
@@ -152,7 +152,7 @@ export abstract class BaseAdapter implements ProviderAdapter {
       emit({
         type: "error",
         error: {
-          code: "unsupported",
+          code: "bad-response",
           message: `${ctx.providerLabel} closed the stream without sending any data. It may not support streaming for this model.`,
           retryable: false,
         },

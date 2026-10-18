@@ -1,4 +1,4 @@
-import type { ApiErrorPayload } from "../shared/types.js";
+import type { ApiErrorPayload, FailureCode } from "../shared/types.js";
 
 /**
  * Environment the API layer reads. All values are optional so the same code
@@ -180,7 +180,7 @@ export function json(body: unknown, init: ResponseInit = {}): Response {
 
 export function apiError(
   status: number,
-  payload: ApiErrorPayload,
+  payload: { code: FailureCode | string; message: string } & Partial<ApiErrorPayload>,
   extraHeaders: Record<string, string> = {},
 ): Response {
   const headers: Record<string, string> = { ...SECURITY_HEADERS, ...extraHeaders };
@@ -191,12 +191,12 @@ export function apiError(
 }
 
 export function errorFromCode(
-  code: ApiErrorPayload["code"],
+  code: FailureCode | string,
   message: string,
   status: number,
   extra?: Partial<ApiErrorPayload>,
 ): Response {
-  return apiError(status, { code, message, ...extra });
+  return apiError(status, { code: code as FailureCode, message, ...extra });
 }
 
 /* ------------------------------------------------------------------ */

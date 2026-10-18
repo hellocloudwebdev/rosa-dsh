@@ -189,7 +189,7 @@ describe("ChatRun", () => {
     expect(run.text).toBe("Complete response");
   });
 
-  it("emits unsupported error when stream closes without sending any content", async () => {
+  it("emits bad-response error when stream closes without sending any content", async () => {
     routes.set("POST /chat/completions", {
       body: "",
     });
@@ -222,7 +222,7 @@ describe("ChatRun", () => {
     expect(errorEvent).toMatchObject({
       type: "error",
       error: {
-        code: "unsupported",
+        code: "bad-response",
       },
     });
   });
@@ -311,11 +311,11 @@ describe("ChatRun", () => {
     expect(errorEvent).toMatchObject({
       type: "error",
       error: {
-        code: "upstream-timeout",
+        code: "timeout",
         retryable: true,
       },
     });
-    expect(run.error?.code).toBe("upstream-timeout");
+    expect(run.error?.code).toBe("timeout");
   });
 
   it("completes successfully when chunks arrive steadily past the inactivity timeout", async () => {

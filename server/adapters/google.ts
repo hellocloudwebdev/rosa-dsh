@@ -1,6 +1,7 @@
 import type { StreamEvent } from "../../shared/types.js";
 import type { RawModel } from "../../shared/models.js";
 import { BaseAdapter, type AdapterContext, type ChatOptions } from "./base.js";
+import { classifyHttpStatus } from "../../shared/providers.js";
 
 /**
  * Google Gemini adapter.
@@ -123,14 +124,16 @@ export class GoogleAdapter extends BaseAdapter {
     }
 
     if (json.error) {
+      const status = typeof json.error.code === "number" ? json.error.code : 500;
+      const failure = classifyHttpStatus(status);
       emit({
         type: "error",
         error: {
-          code: "upstream-error",
-          message: json.error.message ?? "Gemini reported an error.",
+          code: failure.code,
+          message: json.error.message ?? failure.message,
           detail: json.error.status,
           upstreamStatus: json.error.code ?? null,
-          retryable: json.error.code === 429 || (json.error.code ?? 0) >= 500,
+          retryable: failure.retryable,
         },
       });
       return;

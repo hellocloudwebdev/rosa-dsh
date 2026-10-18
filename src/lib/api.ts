@@ -213,7 +213,10 @@ export async function testProvider(
   if (!res.ok) {
     return {
       ok: false,
-      error: data?.error?.message || `Test failed with status ${res.status}`,
+      error:
+        (data?.error ? formatErrorMessage(data.error) : undefined) ||
+        data?.error?.message ||
+        `Test failed with status ${res.status}`,
     };
   }
   return { ok: true, latencyMs: data?.latencyMs };
@@ -543,11 +546,62 @@ export async function cancelChat(requestId: string): Promise<boolean> {
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
+/** Map a FailureCode / ApiErrorPayload to clear, user-facing error copy. */
+export function formatErrorMessage(
+  err?: { code?: string; message?: string; retryAfterSeconds?: number } | null,
+): string {
+  if (!err) return "An unknown error occurred.";
+  if (err.code === "invalid-api-key") {
+    return "Invalid API key. Check your provider credentials, permissions, and expiry.";
+  }
+  if (err.code === "rate-limited") {
+    const wait = err.retryAfterSeconds ? ` Try again in ${err.retryAfterSeconds}s.` : "";
+    return `Rate limit exceeded.${wait} Wait a moment before sending another prompt.`;
+  }
+  if (err.code === "quota-exhausted") {
+    return "Provider quota or credit exhausted. Check your billing account balance.";
+  }
+  if (err.code === "model-not-found") {
+    return "Model not found. Verify the model ID and your account's access to it.";
+  }
+  if (err.code === "forbidden") {
+    return "Access forbidden. Your API key lacks permission for this model or feature.";
+  }
+  if (err.code === "timeout") {
+    return "Request timed out waiting for upstream provider response.";
+  }
+  if (err.code === "too-large") {
+    return "Request payload too large. Try reducing message history or max tokens.";
+  }
+  if (err.code === "truncated-stream") {
+    return "Stream was truncated unexpectedly by provider before completion.";
+  }
+  if (err.code === "network-error") {
+    return "Network error connecting to provider. Check your network or provider status.";
+  }
+  if (err.code === "bad-gateway") {
+    return "Provider gateway error (502/503/504). This is usually temporary.";
+  }
+  if (err.code === "server-error") {
+    return "Provider internal server error (5xx). Please try again shortly.";
+  }
+  if (err.code === "redirect-blocked") {
+    return "Provider attempted an unsafe redirect, which was blocked for security.";
+  }
+  if (err.code === "bad-response") {
+    return err.message || "Provider returned an invalid or unparseable response.";
+  }
+  return err.message || "Provider error occurred.";
+}
+
 async function extractErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
     const text = await res.text();
     const parsed = JSON.parse(text);
-    return parsed?.error?.message || parsed?.message || text || fallback;
+    if (parsed?.error) {
+      return formatErrorMessage(parsed.error);
+    }
+    return parsed?.message || text || fallback;
   } catch {
     return `${fallback} (${res.status} ${res.statusText})`;
   }

@@ -1,4 +1,4 @@
-import type { ApiErrorPayload, ProviderPreset, ProviderKind } from "./types.js";
+import type { ApiErrorPayload, FailureCode, ProviderPreset, ProviderKind } from "./types.js";
 
 /**
  * Presets for the providers we ship adapters for.
@@ -172,54 +172,130 @@ export function redactSecrets(input: string, knownSecrets: readonly string[] = [
   return out;
 }
 
+/**
+ * Classify an HTTP status from an upstream provider into the normalized failure taxonomy.
+ */
+export function classifyHttpStatus(
+  status: number,
+  retryAfterHeader?: string | null,
+): {
+  code: FailureCode;
+  message: string;
+  retryable: boolean;
+  retryAfterSeconds?: number;
+} {
+  const retryAfter = retryAfterHeader ? Number(retryAfterHeader) : undefined;
+
+  switch (status) {
+    case 401:
+      return {
+        code: "invalid-api-key",
+        message: "The provider rejected the API key (401). Check the key, its permissions and its expiry.",
+        retryable: false,
+      };
+    case 403:
+      return {
+        code: "forbidden",
+        message:
+          "The provider refused the request (403). The key may lack access to this model, or your account may be restricted.",
+        retryable: false,
+      };
+    case 404:
+      return {
+        code: "model-not-found",
+        message: "The provider has no resource at that URL (404). Check the Base URL and the selected model id.",
+        retryable: false,
+      };
+    case 408:
+      return {
+        code: "timeout",
+        message: "The provider timed out before responding (408).",
+        retryable: true,
+      };
+    case 413:
+      return {
+        code: "too-large",
+        message: "The provider rejected the request as too large (413). Shorten the conversation or reduce max tokens.",
+        retryable: false,
+      };
+    case 422:
+      return {
+        code: "bad-response",
+        message: "The provider rejected the request body (422). The model may not support a parameter that was sent.",
+        retryable: false,
+      };
+    case 429: {
+      const seconds = Number.isFinite(retryAfter) && (retryAfter as number) > 0 ? Number(retryAfter) : undefined;
+      const wait = seconds ? ` Try again in ${seconds}s.` : "";
+      return {
+        code: "rate-limited",
+        message: `The provider is rate limiting this key (429).${wait}`,
+        retryable: true,
+        retryAfterSeconds: seconds,
+      };
+    }
+    case 402:
+      return {
+        code: "quota-exhausted",
+        message: "The provider reports exhausted credit or billing problems (402).",
+        retryable: false,
+      };
+    default:
+      if (status >= 500) {
+        return {
+          code: status === 502 || status === 503 || status === 504 ? "bad-gateway" : "server-error",
+          message: `The provider returned a server error (${status}). This is usually temporary.`,
+          retryable: true,
+        };
+      }
+      return {
+        code: "unknown",
+        message: `The provider returned an unexpected status (${status}).`,
+        retryable: false,
+      };
+  }
+}
+
 /** Build a normalised ApiErrorPayload from an upstream HTTP failure. */
 export function upstreamError(args: {
   status: number;
   providerLabel: string;
   bodyText: string;
   modelId?: string;
+  retryAfterHeader?: string | null;
 }): ApiErrorPayload {
-  const { status, providerLabel, bodyText, modelId } = args;
+  const { status, providerLabel, bodyText, modelId, retryAfterHeader } = args;
   const clipped = redactSecrets(bodyText).slice(0, 600);
   const where = modelId ? `${providerLabel} · ${modelId}` : providerLabel;
 
-  let code: ApiErrorPayload["code"] = "upstream-error";
-  if (status === 401 || status === 403) code = "unauthorized";
-  else if (status === 404) code = "not-found";
-  else if (status === 429) code = "rate-limited";
-  else if (status === 408) code = "upstream-timeout";
-  else if (status === 413) code = "payload-too-large";
-  else if (status >= 500) code = "upstream-unavailable";
-
-  const hint =
-    status === 401 || status === 403
-      ? "Check the API key and that it has access to this model."
-      : status === 404
-        ? "The path or model id was not found. Verify the Base URL and model id."
-        : status === 429
-          ? "The provider rate-limited this request. Wait and retry."
-          : status >= 500
-            ? "The provider is having trouble. Retry, or try another model."
-            : undefined;
+  const failure = classifyHttpStatus(status, retryAfterHeader);
 
   return {
-    code,
-    message: `${where} returned HTTP ${status}.${hint ? ` ${hint}` : ""}`,
+    code: failure.code,
+    message: `${where}: ${failure.message}`,
     detail: clipped || undefined,
     upstreamStatus: status,
-    retryable: status === 408 || status === 429 || status >= 500,
+    retryable: failure.retryable,
+    retryAfterSeconds: failure.retryAfterSeconds,
   };
 }
 
 /** Map a transport-level failure (DNS, TLS, reset, abort) to a payload. */
 export function transportError(err: unknown, providerLabel: string): ApiErrorPayload {
   const msg = err instanceof Error ? err.message : String(err);
-  const timedOut = /timed?\s?out|aborted|deadline/i.test(msg);
+  const timedOut = /timed?\s?out|deadline/i.test(msg);
+  const isAborted = /abort/i.test(msg);
+  let code: FailureCode = "network-error";
+  if (timedOut) code = "timeout";
+  else if (isAborted) code = "aborted";
+
   return {
-    code: timedOut ? "upstream-timeout" : "upstream-unavailable",
+    code,
     message: timedOut
       ? `${providerLabel} did not respond before the timeout.`
-      : `Could not reach ${providerLabel}.`,
+      : isAborted
+        ? `${providerLabel} request was aborted.`
+        : `Could not reach ${providerLabel}.`,
     detail: redactSecrets(msg).slice(0, 600) || undefined,
     retryable: true,
   };

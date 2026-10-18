@@ -648,7 +648,11 @@ async function handleTestProvider(
       const { toApiError } = await import("./http.js");
       const payload = toApiError(probeErr, row.display_name, [apiKey]);
       // A 404/401 from the chat path still means the host is reachable.
-      if (payload.code !== "not-found" && payload.code !== "unauthorized") {
+      if (
+        payload.code !== "model-not-found" &&
+        payload.code !== "invalid-api-key" &&
+        payload.code !== "unauthorized"
+      ) {
         throw probeErr;
       }
     }
@@ -1281,20 +1285,28 @@ function clampInt(
 
 function statusForCode(code: string): number {
   switch (code) {
+    case "invalid-api-key":
     case "unauthorized":
       return 401;
+    case "quota-exhausted":
+      return 402;
     case "forbidden":
       return 403;
+    case "model-not-found":
     case "not-found":
       return 404;
     case "bad-request":
+    case "bad-response":
       return 400;
     case "rate-limited":
       return 429;
+    case "too-large":
     case "payload-too-large":
       return 413;
+    case "timeout":
     case "upstream-timeout":
       return 504;
+    case "bad-gateway":
     case "upstream-unavailable":
       return 502;
     case "unsupported":

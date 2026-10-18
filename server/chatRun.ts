@@ -134,7 +134,7 @@ export class ChatRun {
 
     if (!body) {
       this.errored = {
-        code: "unsupported",
+        code: "bad-response",
         message: `${this.providerLabel} returned an empty response body.`,
         retryable: false,
       };
@@ -207,7 +207,7 @@ export class ChatRun {
 
     if (timedOut) {
       this.errored = {
-        code: "upstream-timeout",
+        code: "timeout",
         message: `${this.providerLabel} did not respond in time.`,
         retryable: true,
       };
@@ -222,7 +222,7 @@ export class ChatRun {
 
     if (!this.sawAnyDelta) {
       this.errored = {
-        code: "unsupported",
+        code: "bad-response",
         message: `${this.providerLabel} closed the stream without sending any content. It may not support streaming for this model.`,
         retryable: false,
       };

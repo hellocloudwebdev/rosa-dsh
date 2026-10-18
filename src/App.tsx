@@ -44,6 +44,7 @@ import {
   cancelChat,
   setTokenGetter,
   setFavouriteModel,
+  formatErrorMessage,
 } from "./lib/api";
 
 const VIEW_MIN = 380;
@@ -342,7 +343,7 @@ export function App() {
         modelId: m.modelId,
         modelLabel: m.modelLabel,
         metrics: m.metrics,
-        error: m.error?.message || null,
+        error: m.error ? formatErrorMessage(m.error) : null,
         paneIndex: m.paneIndex,
         createdAt: m.createdAt,
       }));
@@ -603,6 +604,7 @@ export function App() {
               ]);
             },
             onError: (err) => {
+              const formattedError = formatErrorMessage(err);
               setPanes((prev) => {
                 const copy = [...prev];
                 const cur = copy[idx];
@@ -610,7 +612,7 @@ export function App() {
                   copy[idx] = {
                     ...cur,
                     streaming: false,
-                    error: err.message || "Provider error occurred",
+                    error: formattedError,
                   };
                 }
                 return copy;
@@ -621,12 +623,12 @@ export function App() {
                 {
                   id: `err-${Date.now()}-${idx}`,
                   role: "assistant",
-                  text: `⚠️ **${mLabel} Error:** ${err.message || "Failed to stream response."}`,
+                  text: `⚠️ **${mLabel} Error:** ${formattedError}`,
                   providerId: pId,
                   modelId: mId,
                   modelLabel: mLabel,
                   paneIndex: paneCount > 1 ? idx : null,
-                  error: err.message,
+                  error: formattedError,
                   createdAt: Date.now(),
                 },
               ]);

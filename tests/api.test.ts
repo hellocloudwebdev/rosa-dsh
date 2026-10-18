@@ -417,10 +417,10 @@ describe("model discovery", () => {
       }, cookie);
       const { provider } = (await jsonOf(create)) as { provider: ProviderConfig };
       const res = await api(`/providers/${provider.id}/models`, "POST", {}, cookie);
-      // An upstream 404 maps to code "not-found" → HTTP 404 (statusForCode).
+      // An upstream 404 maps to code "model-not-found" → HTTP 404 (statusForCode).
       expect(res.status).toBe(404);
       const body = await jsonOf(res);
-      expect((body.error as { code: string }).code).toBe("not-found");
+      expect((body.error as { code: string }).code).toBe("model-not-found");
     } finally {
       restoreFetch();
     }

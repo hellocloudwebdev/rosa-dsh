@@ -243,24 +243,34 @@ export interface Folder {
 /* API errors                                                          */
 /* ------------------------------------------------------------------ */
 
-export type ApiErrorCode =
+export type FailureCode =
+  | "invalid-api-key"
   | "unauthorized"
   | "forbidden"
+  | "model-not-found"
+  | "rate-limited"
+  | "quota-exhausted"
+  | "timeout"
+  | "aborted"
+  | "network-error"
+  | "bad-gateway"
+  | "server-error"
+  | "bad-response"
+  | "redirect-blocked"
+  | "too-large"
+  | "truncated-stream"
+  | "unknown";
+
+export type ApiErrorCode =
+  | FailureCode
   | "not-found"
   | "bad-request"
-  | "rate-limited"
   | "conflict"
   | "payload-too-large"
-  | "upstream-timeout"
-  | "upstream-unavailable"
-  | "upstream-error"
-  | "transport"
-  | "unsupported"
-  | "truncated-stream"
   | "internal";
 
 export interface ApiErrorPayload {
-  code: ApiErrorCode;
+  code: FailureCode;
   message: string;
   /**
    * Provider-visible detail, already redacted. Never contains an API key,
@@ -270,6 +280,7 @@ export interface ApiErrorPayload {
   /** HTTP status the upstream provider returned, when relevant. */
   upstreamStatus?: number | null;
   retryable?: boolean;
+  retryAfterSeconds?: number;
 }
 
 /* ------------------------------------------------------------------ */

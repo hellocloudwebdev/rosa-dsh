@@ -3,8 +3,14 @@ import {
   validateProviderBaseUrl,
   type Lookup,
 } from "../shared/urlGuard.js";
-import { redactSecrets, transportError, upstreamError } from "../shared/providers.js";
+import {
+  redactSecrets,
+  transportError,
+  upstreamError,
+} from "../shared/providers.js";
 import type { ApiErrorPayload } from "../shared/types.js";
+
+export { classifyHttpStatus } from "../shared/providers.js";
 
 /**
  * Hard cap on how long a single provider request may take, regardless of what
@@ -321,6 +327,7 @@ export function toApiError(
       status: err.status,
       providerLabel,
       bodyText: err.bodyText,
+      retryAfterHeader: err.headers.get("retry-after"),
     });
     // The provider may have echoed the key back in its error body; redact the
     // exact value we sent before this reaches the client or the database.
@@ -335,7 +342,7 @@ export function toApiError(
       (err as { cause?: Error | DOMException }).cause?.name === "TimeoutError")
   ) {
     return {
-      code: "upstream-timeout",
+      code: "timeout",
       message: `${providerLabel} did not respond in time.`,
       retryable: true,
     };

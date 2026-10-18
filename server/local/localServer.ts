@@ -177,7 +177,7 @@ async function toWebResponse(
     res.end(
       JSON.stringify({
         error: {
-          code: "internal",
+          code: "server-error",
           message: "The server hit an unexpected error. Check the server logs.",
           retryable: true,
         },

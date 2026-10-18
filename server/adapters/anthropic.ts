@@ -111,7 +111,7 @@ export class AnthropicAdapter extends BaseAdapter {
       emit({
         type: "error",
         error: {
-          code: "upstream-error",
+          code: "bad-response",
           message: json.error?.message ?? "Anthropic reported a streaming error.",
           detail: json.error?.type,
           retryable: json.error?.type === "overloaded_error",
