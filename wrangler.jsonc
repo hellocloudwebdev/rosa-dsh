@@ -26,6 +26,8 @@
   },
   "vars": {
     "NODE_ENV": "production",
-    "CLERK_DOMAIN": "neutral-snipe-8646.clerk.accounts.dev"
+    "CLERK_DOMAIN": "neutral-snipe-8646.clerk.accounts.dev",
+    "CLERK_PUBLISHABLE_KEY": "pk_test_bmV1dHJhbC1zbmlwZS04NjQ2LmNsZXJrLmFjY291bnRzLmRldiQ",
+    "ROSA_PUBLIC_APP_URL": "https://rosa.hellocloud-webdev.workers.dev"
   }
 }

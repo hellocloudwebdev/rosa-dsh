@@ -92,7 +92,7 @@ function withSecurityHeaders(response: Response): Response {
   if (!headers.has("content-security-policy")) {
     headers.set(
       "content-security-policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev; connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://*.supabase.co https://*.pooler.supabase.com https://api.openai.com https://api.anthropic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https://*.clerk.com https://img.clerk.com; frame-src 'self' https://*.clerk.com https://*.clerk.accounts.dev;",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev; connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://*.supabase.co https://*.pooler.supabase.com https://api.openai.com https://api.anthropic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https://*.clerk.com https://img.clerk.com https://*.githubusercontent.com https://*.googleusercontent.com; frame-src 'self' https://*.clerk.com https://*.clerk.accounts.dev;",
     );
   }
 
