@@ -233,7 +233,7 @@ Full walkthrough and security checklist available in [`docs/OAUTH_SETUP.md`](doc
 
 ## Verification & Test Results
 
-The suite executes 284 automated tests across both Node.js server environments and jsdom browser environments.
+The suite executes 275 automated tests across both Node.js server environments and jsdom browser environments.
 
 ```bash
 npm run verify
@@ -242,18 +242,22 @@ npm run verify
 ### Verified Suite Execution:
 - **TypeScript Typecheck (`tsc -b --force`)**: Clean across both root, server, and API projects.
 - **ESLint (`eslint . --max-warnings=0`)**: 0 errors, 0 warnings.
-- **Vitest (`vitest run`)**: **13 test files passed, 284 tests passed**.
+- **Vitest (`vitest run`)**: **15 test files passed, 275 tests passed**.
   - `tests/ssrf.test.ts` (35 tests): IPv4/IPv6 classification, dotted-quad normalisation, wildcard domains, loopback/private host rejection, mock DNS resolution.
   - `tests/security.test.ts` (28 tests): /health fingerprinting prevention, client IP header trust verification, probe rate limits, byte-level body caps, cross-user cancel isolation, live secret redaction, PKCE S256 verification, master key 32-byte floor.
   - `tests/drivers.test.ts` (32 tests): SQLite driver transactions, batch executions, D1-REST HTTP driver protocol, statement splitting.
+  - `tests/repository.test.ts` (35 tests): User session upsert, OAuth state lifecycle, encrypted provider storage, messages and conversations.
+  - `tests/models.test.ts` (22 tests): Model metadata parsing, context window inference, modality extraction, capability detection.
+  - `tests/api.test.ts` (23 tests): Handler-level integration tests through `handleApiRequest`.
   - `tests/adapters.test.ts` (19 tests): Adapter normalization, streaming chunk handling, HTTP error translation across all provider kinds.
-  - `tests/chatRun.test.ts` (18 tests): Streaming execution, SSE chunking, performance.now monotonic timing, cancellation abort propagation.
-  - `tests/modelSelection.test.ts` (12 tests): Multi-pane selection resolution, favourites, defaults.
-  - `tests/theme.test.ts` (13 tests): Tailwind CSS tokens, CSS custom property resolution, contrast, dark-mode classes.
-  - `tests/ui/concurrency.dom.test.tsx` (19 tests): Multi-pane independent streaming, per-pane stop, UI state reducers.
-  - `tests/repository.test.ts`: User session upsert, OAuth state lifecycle, encrypted provider storage, messages and conversations.
-  - `tests/urlGuard.test.ts`: Canonical hostnames, IP address filters.
-  - `tests/api.test.ts`: Handler-level integration tests through `handleApiRequest`.
+  - `tests/sse.test.ts` (16 tests): SSE parser framing, multiline data lines, BOM stripping, trailing flushes.
+  - `tests/urlGuard.test.ts` (15 tests): Canonical hostnames, IP address filters, SSRF prevention.
+  - `tests/crypto.test.ts` (15 tests): AES-256-GCM encryption/decryption, HKDF key derivation, envelope security.
+  - `tests/errorTaxonomy.test.ts` (15 tests): HTTP status code classification, retry-after header parsing, provider failure normalization, user-facing error formatting.
+  - `tests/clerk-supabase.test.ts` (9 tests): Clerk JWT authentication verification, Supabase PostgreSQL persistence integration.
+  - `tests/chatRun.test.ts` (7 tests): Streaming execution, truncated stream detection, inactivity-based timeouts, steady streaming re-arming, cancellation abort propagation.
+  - `tests/ui/comparisonPane.dom.test.tsx` (2 tests): Per-pane scroll isolation, independent scroll-to-latest button.
+  - `tests/ui/emptyStateCta.dom.test.tsx` (2 tests): Empty workspace state CTA to configure providers when zero models exist.
 - **Production Build (`vite build`)**: Complete client assets compiled cleanly into `dist/`.
 
 ---

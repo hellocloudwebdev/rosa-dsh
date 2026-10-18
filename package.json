@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "keys:generate": "node -e \"console.log(crypto.randomBytes(32).toString('base64url'))\"",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "deploy:cf": "vite build && wrangler deploy",
     "db:cf:migrate": "wrangler d1 migrations apply rosa-db --remote",
