@@ -256,6 +256,7 @@ export type ApiErrorCode =
   | "upstream-error"
   | "transport"
   | "unsupported"
+  | "truncated-stream"
   | "internal";
 
 export interface ApiErrorPayload {

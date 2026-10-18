@@ -60,14 +60,18 @@ export class AzureOpenAIAdapter extends BaseAdapter {
     throw new Error("Azure OpenAI model discovery is not supported.");
   }
 
-  protected handleSSE(data: string, emit: (e: StreamEvent) => void): void {
-    if (data === "[DONE]") return;
+  protected handleSSE(
+    data: string,
+    emit: (e: StreamEvent) => void,
+  ): { finishReason?: string | null } | void {
+    if (data === "[DONE]" || data === "DONE") return { finishReason: "stop" };
     try {
       const json = JSON.parse(data) as {
         choices?: Array<{ delta?: { content?: string | null }; finish_reason?: string | null }>;
         usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
       };
-      const text = json.choices?.[0]?.delta?.content;
+      const choice = json.choices?.[0];
+      const text = choice?.delta?.content;
       if (typeof text === "string" && text.length > 0) emit({ type: "delta", text });
       if (json.usage) {
         const inputTokens =
@@ -79,6 +83,9 @@ export class AzureOpenAIAdapter extends BaseAdapter {
         if (inputTokens !== null || outputTokens !== null) {
           emit({ type: "usage", inputTokens, outputTokens, estimated: false });
         }
+      }
+      if (choice?.finish_reason) {
+        return { finishReason: choice.finish_reason };
       }
     } catch {
       /* ignore partial */

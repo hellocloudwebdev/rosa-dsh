@@ -83,15 +83,19 @@ export class AnthropicAdapter extends BaseAdapter {
     return { models, fromListing: true };
   }
 
-  protected handleSSE(data: string, emit: (e: StreamEvent) => void): void {
+  protected handleSSE(
+    data: string,
+    emit: (e: StreamEvent) => void,
+  ): { finishReason?: string | null } | void {
     // We are handed the concatenated data lines. The `event:` name is not
     // forwarded by the base parser, so we dispatch on the payload's `type`.
     let json: {
       type?: string;
-      delta?: { type?: string; text?: string; partial_json?: string };
+      delta?: { type?: string; text?: string; partial_json?: string; stop_reason?: string };
       message?: {
         usage?: { input_tokens?: number; output_tokens?: number };
         model?: string;
+        stop_reason?: string;
       };
       usage?: { output_tokens?: number; input_tokens?: number };
       error?: { type?: string; message?: string };
@@ -138,7 +142,14 @@ export class AnthropicAdapter extends BaseAdapter {
       if (typeof out === "number") {
         emit({ type: "usage", inputTokens: null, outputTokens: out, estimated: false });
       }
+      if (json.delta?.stop_reason) {
+        return { finishReason: json.delta.stop_reason };
+      }
       return;
+    }
+
+    if (json.type === "message_stop") {
+      return { finishReason: "stop" };
     }
 
     // context management / model metadata, when present.

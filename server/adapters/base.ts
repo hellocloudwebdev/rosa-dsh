@@ -162,7 +162,10 @@ export abstract class BaseAdapter implements ProviderAdapter {
   }
 
   /** Override to translate provider-specific SSE payloads into deltas. */
-  protected handleSSE(data: string, _emit: (e: StreamEvent) => void): void {
+  protected handleSSE(
+    data: string,
+    _emit: (e: StreamEvent) => void,
+  ): { finishReason?: string | null } | void {
     void data;
   }
 

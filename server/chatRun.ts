@@ -36,6 +36,8 @@ export class ChatRun {
   private fullText = "";
   private contextWindow: number | null = null;
   private sawAnyDelta = false;
+  private sawFinish = false;
+  private finishReason: string | null = null;
   private errored: ApiErrorPayload | null = null;
   private cancelled = false;
 
@@ -137,7 +139,17 @@ export class ChatRun {
     // StreamEvent vocabulary; our trampoline records measurements on the way.
     const emitTrampoline = (e: StreamEvent) => this.applyEvent(e, emit);
     const parser = new SSEParser({
-      onEvent: (evt) => call.handleSSE(evt.data, emitTrampoline),
+      onEvent: (evt) => {
+        if (evt.data === "[DONE]" || evt.data === "DONE") {
+          this.sawFinish = true;
+          return;
+        }
+        const res = call.handleSSE(evt.data, emitTrampoline);
+        if (res?.finishReason) {
+          this.sawFinish = true;
+          this.finishReason = res.finishReason;
+        }
+      },
     });
 
     try {
@@ -171,8 +183,18 @@ export class ChatRun {
       return;
     }
 
+    if (this.sawAnyDelta && !this.sawFinish) {
+      this.errored = {
+        code: "truncated-stream",
+        message: `${this.providerLabel} closed the stream without finishing the response.`,
+        retryable: true,
+      };
+      emit({ type: "error", error: this.errored });
+      return;
+    }
+
     this.finish();
-    emit({ type: "done", finishReason: "stop", metrics: this.metrics() });
+    emit({ type: "done", finishReason: this.finishReason ?? "stop", metrics: this.metrics() });
   }
 
   /** Terminate a cancelled run with honest partial metrics. */
@@ -313,7 +335,10 @@ interface AdapterCall {
   chatUrl: (ctx: AdapterContext, modelId: string) => string;
   chatHeaders: (ctx: AdapterContext, modelId: string) => Record<string, string>;
   buildBody: (ctx: AdapterContext, opts: ChatOptions) => Record<string, unknown>;
-  handleSSE: (data: string, emit: (e: StreamEvent) => void) => void;
+  handleSSE: (
+    data: string,
+    emit: (e: StreamEvent) => void,
+  ) => { finishReason?: string | null } | void;
 }
 
 function adapterCall(adapter: ProviderAdapter): AdapterCall {

@@ -109,8 +109,11 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
     return { models, fromListing: true };
   }
 
-  protected handleSSE(data: string, emit: (e: StreamEvent) => void): void {
-    if (data === "[DONE]") return;
+  protected handleSSE(
+    data: string,
+    emit: (e: StreamEvent) => void,
+  ): { finishReason?: string | null } | void {
+    if (data === "[DONE]" || data === "DONE") return { finishReason: "stop" };
     let json: {
       choices?: Array<{
         delta?: { content?: string | null; reasoning?: string | null };
@@ -153,6 +156,7 @@ export class OpenAICompatibleAdapter extends BaseAdapter {
 
     if (choice?.finish_reason) {
       emit({ type: "context", contextWindow: null, source: "unavailable" });
+      return { finishReason: choice.finish_reason };
     }
   }
 

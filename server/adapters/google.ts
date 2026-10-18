@@ -100,7 +100,10 @@ export class GoogleAdapter extends BaseAdapter {
     return { models, fromListing: true };
   }
 
-  protected handleSSE(data: string, emit: (e: StreamEvent) => void): void {
+  protected handleSSE(
+    data: string,
+    emit: (e: StreamEvent) => void,
+  ): { finishReason?: string | null } | void {
     let json: {
       candidates?: Array<{
         content?: { parts?: Array<{ text?: string; functionCall?: unknown }> };
@@ -133,7 +136,8 @@ export class GoogleAdapter extends BaseAdapter {
       return;
     }
 
-    const parts = json.candidates?.[0]?.content?.parts ?? [];
+    const candidate = json.candidates?.[0];
+    const parts = candidate?.content?.parts ?? [];
     for (const part of parts) {
       if (typeof part?.text === "string" && part.text.length > 0) {
         emit({ type: "delta", text: part.text });
@@ -151,6 +155,10 @@ export class GoogleAdapter extends BaseAdapter {
           estimated: false,
         });
       }
+    }
+
+    if (candidate?.finishReason) {
+      return { finishReason: candidate.finishReason };
     }
   }
 
