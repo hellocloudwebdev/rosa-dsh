@@ -93,7 +93,21 @@ export function ModelIcon({
     return <Bot className={`${className} text-cyan-400`} />;
   }
   if (t === "star") {
-    return <StarburstIcon className={`${className} text-[#558766]`} />;
+    return <StarburstIcon className={`${className} text-[var(--text-primary)]`} />;
   }
-  return <Sparkles className={`${className} text-[var(--lime-text)]`} />;
+  return <Sparkles className={`${className} text-[var(--lime-badge)]`} />;
+}
+
+export function AceStudioIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <div
+      className={`rounded-md bg-[#c6f232] flex items-center justify-center shrink-0 p-0.5 shadow-2xs ${className}`}
+      aria-hidden="true"
+    >
+      <div className="w-full h-full rounded-full border border-black/30 flex overflow-hidden">
+        <div className="w-1/2 h-full bg-neutral-900" />
+        <div className="w-1/2 h-full bg-transparent" />
+      </div>
+    </div>
+  );
 }

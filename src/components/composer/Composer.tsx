@@ -4,7 +4,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import { ArrowUp, Paperclip, Square, X, SlidersHorizontal } from "lucide-react";
+import { ArrowUp, Square, X, SlidersHorizontal, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import * as Popover from "@radix-ui/react-popover";
 import type { ModelWithProvider } from "@shared/types.js";
@@ -129,15 +129,15 @@ export function Composer({
 
       {/* Toolbar */}
       <div className="mt-2.5 pt-2 border-t border-[var(--border-subtle)] flex items-center gap-2 flex-wrap">
-        {/* Attach files */}
+        {/* Plus / Attach button */}
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="flex items-center gap-1 px-2 h-8 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)] transition-colors cursor-pointer"
+          className="w-8 h-8 rounded-lg border border-[var(--border-strong)] bg-white dark:bg-white/5 hover:bg-[var(--hover-overlay)] flex items-center justify-center text-[var(--text-secondary)] transition-colors cursor-pointer"
           title="Attach file or code snippet"
+          aria-label="Attach files"
         >
-          <Paperclip className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Attach</span>
+          <Plus className="w-4 h-4" />
         </button>
         <input
           ref={fileRef}
@@ -243,7 +243,7 @@ export function Composer({
             disabled={!value.trim()}
             className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
               value.trim()
-                ? "bg-[var(--lime)] text-white hover:opacity-90 shadow-md"
+                ? "bg-[#c6f232] text-black font-semibold hover:opacity-90 shadow-sm"
                 : isLight
                   ? "bg-neutral-100 text-neutral-400 cursor-not-allowed"
                   : "bg-white/5 text-neutral-500 cursor-not-allowed"

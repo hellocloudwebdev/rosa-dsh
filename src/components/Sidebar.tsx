@@ -14,17 +14,17 @@ import {
   Trash2,
   Edit2,
   Sparkles,
-  Layers,
   Sun,
   Moon,
-  Bot,
   Check,
   ChevronRight,
   ChevronDown,
+  ChevronsUpDown,
 } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { Conversation, Folder as FolderType, UserProfile } from "@shared/types.js";
 import type { NavItemId } from "../types";
+import { StarburstIcon, AceStudioIcon } from "./composer/icons";
 
 export type Theme = "dark" | "light";
 
@@ -145,11 +145,9 @@ export function Sidebar({
     >
       <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden p-3.5 pt-4">
         {/* Brand Header */}
-        <div className="flex items-center justify-between mb-4 px-1 min-h-[32px]">
+        <div className="flex items-center justify-between mb-3 px-1 min-h-[32px]">
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-7 h-7 rounded-xl bg-[var(--lime)]/15 border border-[var(--lime)]/30 text-[var(--lime-text)] flex items-center justify-center shrink-0">
-              <Bot className="w-4 h-4" />
-            </div>
+            <StarburstIcon className="w-5 h-5 text-[var(--text-primary)] shrink-0" />
             <AnimatePresence>
               {!isCollapsed && (
                 <motion.span
@@ -159,7 +157,7 @@ export function Sidebar({
                   transition={{ duration: 0.15 }}
                   className="font-bold text-[16px] text-[var(--text-primary)] tracking-tight whitespace-nowrap"
                 >
-                  Rosa AI
+                  Acme AI
                 </motion.span>
               )}
             </AnimatePresence>
@@ -173,17 +171,17 @@ export function Sidebar({
           </button>
         </div>
 
-        {/* Workspace selector (When expanded) */}
+        {/* Model / Studio pill selector */}
         {!isCollapsed && (
-          <div className="mb-3 px-0.5">
+          <div className="mb-4 px-0.5">
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
-                <button className="w-full flex items-center justify-between border border-[var(--border-strong)] rounded-xl px-2.5 h-9 bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] text-xs font-medium text-[var(--text-primary)] transition-colors cursor-pointer outline-none">
+                <button className="w-full flex items-center justify-between border border-[var(--border-strong)] rounded-xl px-2.5 h-10 bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] text-xs font-semibold text-[var(--text-primary)] transition-all cursor-pointer outline-none shadow-xs">
                   <span className="flex items-center gap-2 truncate">
-                    <Layers className="w-3.5 h-3.5 text-[var(--lime-text)] shrink-0" />
-                    <span className="truncate">{workspace}</span>
+                    <AceStudioIcon className="w-4 h-4" />
+                    <span className="truncate">{workspace === "All Models & Providers" ? "Ace Studio 2.0" : workspace}</span>
                   </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
+                  <ChevronsUpDown className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
                 </button>
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
@@ -193,7 +191,7 @@ export function Sidebar({
                   className="w-56 bg-white dark:bg-[#202721] text-neutral-900 dark:text-neutral-100 rounded-xl p-1.5 border border-neutral-200 dark:border-white/10 shadow-xl dark:shadow-2xl z-50 focus:outline-none"
                 >
                   <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                    Workspace Filter
+                    Workspace Mode
                   </div>
                   {WORKSPACE_MODES.map((ws) => (
                     <DropdownMenu.Item
@@ -206,12 +204,19 @@ export function Sidebar({
                       }`}
                     >
                       <span>{ws.name}</span>
-                      {workspace === ws.name && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                      {workspace === ws.name && <Check className="w-3.5 h-3.5 text-[#507d00] dark:text-[#c6f232]" />}
                     </DropdownMenu.Item>
                   ))}
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
+          </div>
+        )}
+
+        {/* Section: Create */}
+        {!isCollapsed && (
+          <div className="px-1 text-[11px] font-medium text-[var(--text-muted)] tracking-normal mb-1.5">
+            Create
           </div>
         )}
 
@@ -222,16 +227,16 @@ export function Sidebar({
             onNewChat();
           }}
           title={isCollapsed ? "New Chat (Ctrl+Shift+O)" : undefined}
-          className={`w-full flex items-center justify-between h-9 rounded-xl font-semibold text-xs bg-[var(--lime)] text-white hover:opacity-90 transition-all cursor-pointer shadow-sm ${
+          className={`w-full flex items-center justify-between h-9 rounded-xl font-medium text-xs bg-[#F0F0ED] dark:bg-white/10 hover:bg-[#E8E8E4] dark:hover:bg-white/15 text-[var(--text-primary)] transition-all cursor-pointer shadow-xs mb-3 ${
             isCollapsed ? "justify-center px-0" : "px-3"
           }`}
         >
           <span className="flex items-center gap-2">
-            <Plus className="w-4 h-4 stroke-[2.4]" />
-            {!isCollapsed && <span>New Conversation</span>}
+            <Plus className="w-4 h-4 text-[var(--text-primary)]" />
+            {!isCollapsed && <span>New Chat</span>}
           </span>
           {!isCollapsed && (
-            <span className="text-[10px] opacity-75 font-mono">⌘⇧O</span>
+            <span className="text-[10px] text-[var(--text-muted)] font-mono">⌘N</span>
           )}
         </button>
 

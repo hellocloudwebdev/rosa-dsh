@@ -1,24 +1,23 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import {
-  Sparkles,
   Zap,
   Clock,
   BarChart2,
   Copy,
   Check,
   Scale,
-  Brain,
-  Code2,
-  Terminal,
   ArrowDown,
   Key,
+  Plus,
+  Search,
+  Globe,
 } from "lucide-react";
 import type { ModelWithProvider } from "@shared/types.js";
 import { Composer } from "./composer/Composer";
 import type { Mode } from "./composer/ModeMenu";
 import type { Theme } from "./Sidebar";
 import type { Msg, ChatPane } from "../types";
-import { ModelIcon } from "./composer/icons";
+import { ModelIcon, StarburstIcon } from "./composer/icons";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { ModelMenu } from "./composer/ModelMenu";
 import { ComparisonPane } from "./ComparisonPane";
@@ -45,26 +44,30 @@ interface PrimaryWorkspaceProps {
   theme: Theme;
 }
 
-const DEFAULT_SUGGESTIONS = [
+const SUGGESTED_FOR_TODAY = [
+  {
+    icon: Plus,
+    action: "Generate",
+    description: "a welcome email for new subscribers joining our newsletter",
+    prompt: "Generate an engaging, concise welcome email for new subscribers joining our newsletter.",
+  },
+  {
+    icon: Search,
+    action: "Summarize",
+    description: "a product launch email for our newest AI features",
+    prompt: "Summarize the key highlights and value propositions of our newest AI feature release into a crisp launch email.",
+  },
+  {
+    icon: Globe,
+    action: "Automate",
+    description: "a re-engagement email for customers who haven't opened in 30 days",
+    prompt: "Write a high-converting re-engagement email for users who have been inactive for over 30 days.",
+  },
   {
     icon: Scale,
-    title: "Side-by-Side Model Showdown",
+    action: "Compare",
+    description: "reasoning differences between Claude 3.5 Sonnet and GPT-4o",
     prompt: "Compare the reasoning differences between Claude 3.5 Sonnet and GPT-4o on designing a distributed cache.",
-  },
-  {
-    icon: Code2,
-    title: "Zero-Cost TypeScript Refactor",
-    prompt: "Refactor this async handler to eliminate memory leaks and handle SSRF attacks safely.",
-  },
-  {
-    icon: Brain,
-    title: "First Principles Decomposition",
-    prompt: "Explain how SQLite achieves ACID transactions via Write-Ahead Logging (WAL) from first principles.",
-  },
-  {
-    icon: Terminal,
-    title: "Local Ollama Benchmarking",
-    prompt: "Benchmark reasoning throughput on my local Ollama model vs cloud models.",
   },
 ];
 
@@ -161,24 +164,48 @@ export function PrimaryWorkspace({
         <div className="max-w-4xl mx-auto w-full space-y-6">
           {/* Empty state when no conversation */}
           {messages.length === 0 && !isLoading && (
-            <div className="py-12 text-center max-w-xl mx-auto">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--lime)]/15 border border-[var(--lime)]/30 text-[var(--lime-text)] flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="w-6 h-6" />
+            <div className="py-8 sm:py-12 text-center max-w-xl mx-auto w-full px-2">
+              {/* Starburst icon from reference image */}
+              <div className="flex justify-center mb-3">
+                <StarburstIcon className="w-8 h-8 text-[var(--text-primary)]" />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mb-2">
-                Rosa Multi-Model AI Workspace
+
+              {/* Editorial Serif Headline matching reference image */}
+              <h1 className="font-serif text-3xl sm:text-[34px] font-normal tracking-tight text-[var(--text-primary)] mb-6">
+                Create Emails Worth Opening
               </h1>
-              <p className="text-sm text-[var(--text-secondary)] mb-8 leading-relaxed">
-                Connect your custom API keys or local Ollama endpoints. Chat with single models or compare multiple providers side-by-side with real metrics.
-              </p>
+
+              {/* Central Floating Composer in Empty State matching reference image */}
+              <div className="mb-6 text-left">
+                <Composer
+                  value={prompt}
+                  onValueChange={onPromptChange}
+                  onSubmit={() => {
+                    scrollToBottom(false);
+                    onSubmit();
+                  }}
+                  isStreaming={isLoading}
+                  onCancel={onCancelStream}
+                  mode={mode}
+                  onModeChange={onModeChange}
+                  models={models}
+                  selectedModel={selectedModel}
+                  onSelectModel={onSelectModel}
+                  onOpenProvidersModal={onOpenProvidersModal}
+                  paneCount={paneCount}
+                  temperature={temperature}
+                  onTemperatureChange={onTemperatureChange}
+                  theme={theme}
+                />
+              </div>
 
               {/* Direct CTA when no models configured */}
               {models.length === 0 && (
                 <div
                   data-testid="no-models-cta-card"
-                  className="mb-8 flex flex-col items-center justify-center p-6 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-panel-2)] shadow-sm"
+                  className="mb-6 flex flex-col items-center justify-center p-6 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-panel-2)] shadow-xs"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-[var(--lime)]/10 text-[var(--lime-text)] flex items-center justify-center mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#c6f232] text-black flex items-center justify-center mb-3">
                     <Key className="w-5 h-5" />
                   </div>
                   <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
@@ -191,7 +218,7 @@ export function PrimaryWorkspace({
                     type="button"
                     onClick={onOpenProvidersModal}
                     data-testid="configure-provider-cta"
-                    className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--lime)]/40 bg-[var(--lime)] text-white hover:opacity-90 flex items-center gap-2 shadow-sm transition-all cursor-pointer font-medium"
+                    className="px-4 py-2 text-xs font-semibold rounded-xl bg-[#c6f232] text-black hover:opacity-90 flex items-center gap-2 shadow-xs transition-all cursor-pointer font-medium"
                   >
                     <Key className="w-3.5 h-3.5" />
                     <span>Configure Provider & API Key</span>
@@ -199,31 +226,34 @@ export function PrimaryWorkspace({
                 </div>
               )}
 
-              {/* Suggestions Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-                {DEFAULT_SUGGESTIONS.map((s, i) => {
-                  const Icon = s.icon;
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        onPromptChange(s.prompt);
-                      }}
-                      className="p-3.5 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:border-[var(--lime)]/50 hover:bg-[var(--hover-overlay)] transition-all cursor-pointer text-left group"
-                    >
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <Icon className="w-4 h-4 text-[var(--lime-text)]" />
-                        <span className="text-xs font-semibold text-[var(--text-primary)] group-hover:text-[var(--lime-text)] transition-colors">
-                          {s.title}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
-                        {s.prompt}
-                      </p>
-                    </button>
-                  );
-                })}
+              {/* Suggested for today */}
+              <div className="text-left w-full mt-2">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">
+                  Suggested for today
+                </h3>
+                <div className="space-y-1.5">
+                  {SUGGESTED_FOR_TODAY.map((s, i) => {
+                    const Icon = s.icon;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          onPromptChange(s.prompt);
+                        }}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:border-[#c6f232] hover:bg-[var(--hover-overlay)] transition-all cursor-pointer text-left flex items-center gap-3 group shadow-2xs"
+                      >
+                        <div className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] shrink-0 flex items-center justify-center">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="text-xs leading-relaxed truncate">
+                          <strong className="font-semibold text-[var(--text-primary)]">{s.action} </strong>
+                          <span className="text-[var(--text-secondary)]">{s.description}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -245,8 +275,8 @@ export function PrimaryWorkspace({
                 <div
                   className={`max-w-[85%] rounded-2xl p-4 transition-all ${
                     isUser
-                      ? "bg-[var(--lime)] text-white shadow-sm"
-                      : "bg-[var(--bg-panel-2)] border border-[var(--border-strong)] text-[var(--text-primary)] shadow-sm"
+                      ? "bg-[#c6f232] text-neutral-900 font-medium shadow-xs"
+                      : "bg-[var(--bg-panel-2)] border border-[var(--border-strong)] text-[var(--text-primary)] shadow-xs"
                   }`}
                 >
                   {/* Header on assistant messages */}
@@ -435,31 +465,33 @@ export function PrimaryWorkspace({
         </div>
       )}
 
-      {/* Docked Composer Area */}
-      <div className="px-4 md:px-8 pb-5 pt-2 shrink-0">
-        <div className="max-w-4xl mx-auto w-full">
-          <Composer
-            value={prompt}
-            onValueChange={onPromptChange}
-            onSubmit={() => {
-              scrollToBottom(false);
-              onSubmit();
-            }}
-            isStreaming={isLoading}
-            onCancel={onCancelStream}
-            mode={mode}
-            onModeChange={onModeChange}
-            models={models}
-            selectedModel={selectedModel}
-            onSelectModel={onSelectModel}
-            onOpenProvidersModal={onOpenProvidersModal}
-            paneCount={paneCount}
-            temperature={temperature}
-            onTemperatureChange={onTemperatureChange}
-            theme={theme}
-          />
+      {/* Docked Composer Area (when conversation is active or streaming) */}
+      {(messages.length > 0 || isLoading) && (
+        <div className="px-4 md:px-8 pb-5 pt-2 shrink-0">
+          <div className="max-w-4xl mx-auto w-full">
+            <Composer
+              value={prompt}
+              onValueChange={onPromptChange}
+              onSubmit={() => {
+                scrollToBottom(false);
+                onSubmit();
+              }}
+              isStreaming={isLoading}
+              onCancel={onCancelStream}
+              mode={mode}
+              onModeChange={onModeChange}
+              models={models}
+              selectedModel={selectedModel}
+              onSelectModel={onSelectModel}
+              onOpenProvidersModal={onOpenProvidersModal}
+              paneCount={paneCount}
+              temperature={temperature}
+              onTemperatureChange={onTemperatureChange}
+              theme={theme}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

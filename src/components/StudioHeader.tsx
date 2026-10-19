@@ -5,7 +5,6 @@ import {
   PanelRight,
   ChevronDown,
   Check,
-  Bot,
   BarChart2,
   GitCompare,
   FileText,
@@ -14,6 +13,7 @@ import {
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { SignInButton, UserButton, useAuth } from "@clerk/react";
 import type { ViewType } from "../types";
+import { AceStudioIcon } from "./composer/icons";
 
 interface StudioHeaderProps {
   conversationTitle: string;
@@ -62,8 +62,8 @@ export function StudioHeader({
       <div className="flex items-center gap-3 overflow-hidden min-w-0">
         <div className="hidden lg:flex items-center gap-2 text-xs text-[var(--text-muted)] shrink-0">
           <span className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-            <Bot className="w-3.5 h-3.5 text-[var(--lime-text)]" />
-            <span>Rosa</span>
+            <AceStudioIcon className="w-3.5 h-3.5" />
+            <span>Ace Studio</span>
           </span>
           <span>/</span>
           <span>Workspace</span>
@@ -118,7 +118,7 @@ export function StudioHeader({
               onClick={() => onSetPaneCount(count)}
               className={`px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                 paneCount === count
-                  ? "bg-[var(--lime)] text-white font-semibold shadow-xs"
+                  ? "bg-[#c6f232] text-black font-semibold shadow-xs"
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
               title={count === 1 ? "Single Model Chat" : `Compare ${count} Models Side-by-Side`}

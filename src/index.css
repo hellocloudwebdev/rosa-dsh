@@ -18,19 +18,21 @@ html,
 body,
 .theme-dark,
 .dark {
-  --bg-app: #181d19;
-  --bg-panel: #202721;
-  --bg-panel-2: #283129;
+  --bg-app: #121314;
+  --bg-panel: #18191a;
+  --bg-panel-2: #212224;
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-strong: rgba(255, 255, 255, 0.14);
   --text-primary: #f4f4f5;
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
-  --hover-overlay: rgba(255, 255, 255, 0.07);
-  --active-overlay: rgba(255, 255, 255, 0.12);
-  --chip-bg: rgba(255, 255, 255, 0.07);
-  --lime: #558766;
-  --lime-text: #8cd6a5;
+  --hover-overlay: rgba(255, 255, 255, 0.06);
+  --active-overlay: rgba(255, 255, 255, 0.10);
+  --chip-bg: rgba(255, 255, 255, 0.06);
+  --lime: #c6f232;
+  --lime-dark: #18181b;
+  --lime-text: #c6f232;
+  --lime-badge: #c6f232;
   color-scheme: dark;
 }
 
@@ -40,19 +42,21 @@ body.light,
 body.theme-light,
 .theme-light,
 .light {
-  --bg-app: #f9f9f8;
-  --bg-panel: #ffffff;
+  --bg-app: #f4f3ee;
+  --bg-panel: #fcfcfc;
   --bg-panel-2: #ffffff;
-  --border-subtle: rgba(0, 0, 0, 0.08);
-  --border-strong: rgba(0, 0, 0, 0.15);
-  --text-primary: #111827;
-  --text-secondary: #374151;
-  --text-muted: #6b7280;
-  --hover-overlay: rgba(0, 0, 0, 0.05);
-  --active-overlay: rgba(0, 0, 0, 0.08);
-  --chip-bg: rgba(0, 0, 0, 0.05);
-  --lime: #447253;
-  --lime-text: #2f5c40;
+  --border-subtle: #eeeee9;
+  --border-strong: #e4e4df;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #8e8e93;
+  --hover-overlay: rgba(0, 0, 0, 0.04);
+  --active-overlay: rgba(0, 0, 0, 0.07);
+  --chip-bg: #f0f0ec;
+  --lime: #c6f232;
+  --lime-dark: #18181b;
+  --lime-text: #18181b;
+  --lime-badge: #507d00;
   color-scheme: light;
 }
 

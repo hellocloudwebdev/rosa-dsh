@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronDown, Search, Star, Plus, Sparkles, Eye, Wrench } from "lucide-react";
+import { Check, ChevronDown, Search, Star, Plus, Eye, Wrench } from "lucide-react";
 import type { ModelWithProvider } from "@shared/types.js";
-import { ModelIcon } from "./icons";
+import { ModelIcon, AceStudioIcon } from "./icons";
 
 interface ModelMenuProps {
   models: ModelWithProvider[];
@@ -107,19 +107,19 @@ export function ModelMenu({
         <button
           type="button"
           disabled={disabled}
-          className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium cursor-pointer outline-none transition-colors border bg-white dark:bg-[#283129] hover:bg-neutral-50 dark:hover:bg-[#323d33] border-neutral-200 dark:border-white/10 text-neutral-800 dark:text-neutral-100 ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`flex items-center gap-2 h-8 px-2.5 rounded-lg text-xs font-semibold cursor-pointer outline-none transition-colors border bg-white dark:bg-[var(--bg-panel-2)] hover:bg-[var(--hover-overlay)] border-[var(--border-strong)] text-[var(--text-primary)] shadow-2xs ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           {activeModel ? (
             <>
-              <ModelIcon type={activeModel.provider?.kind || activeModel.modelId} className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate max-w-[130px] sm:max-w-[160px]">
+              <AceStudioIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate max-w-[130px] sm:max-w-[160px] font-medium">
                 {activeModel.displayName || activeModel.modelId}
               </span>
             </>
           ) : (
             <>
-              <Sparkles className="w-3.5 h-3.5 text-[var(--lime-text)]" />
-              <span>Select Model</span>
+              <AceStudioIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="font-medium">Select Model</span>
             </>
           )}
           <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
