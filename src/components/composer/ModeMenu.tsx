@@ -1,6 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, MessageSquare, Brain, Code } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 export type Mode = "Ask" | "Plan" | "Build";
 
@@ -30,38 +30,67 @@ export function ModeMenu({ mode, onChange }: ModeMenuProps) {
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <motion.button
-          whileTap={{ scale: 0.96 }}
+          layout
+          whileTap={{ scale: 0.94 }}
           type="button"
-          className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium cursor-pointer outline-none transition-all border bg-neutral-100/90 dark:bg-white/10 hover:bg-neutral-200/80 dark:hover:bg-white/15 border-neutral-200/80 dark:border-white/10 text-neutral-800 dark:text-neutral-100 shadow-2xs"
+          transition={{ type: "spring", stiffness: 500, damping: 32 }}
+          className="flex items-center gap-1.5 h-8.5 px-3.5 rounded-full text-xs font-semibold cursor-pointer outline-none transition-colors border bg-white dark:bg-[#242528] hover:bg-neutral-50 dark:hover:bg-[#2c2d31] border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-neutral-100 shadow-2xs select-none"
         >
-          <span>{active.label}</span>
-          <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={active.id}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.15 }}
+            >
+              {active.label}
+            </motion.span>
+          </AnimatePresence>
+          <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
         </motion.button>
       </DropdownMenu.Trigger>
 
       <DropdownMenu.Portal>
         <DropdownMenu.Content
+          asChild
+          side="top"
           align="start"
-          sideOffset={8}
-          className="w-44 rounded-2xl p-1.5 z-50 border shadow-2xl bg-white/95 dark:bg-[#1e1f23]/95 backdrop-blur-md border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-neutral-100 focus:outline-none animate-in fade-in-50 zoom-in-95 duration-100"
+          sideOffset={10}
         >
-          {MODES.map((m) => {
-            const isSelected = m.id === mode;
-            return (
-              <DropdownMenu.Item
-                key={m.id}
-                onSelect={() => onChange(m.id)}
-                className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer outline-none transition-colors ${
-                  isSelected
-                    ? "bg-neutral-100 dark:bg-white/10 font-semibold text-neutral-900 dark:text-white"
-                    : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white font-normal"
-                }`}
-              >
-                <span>{m.label}</span>
-                {isSelected && <Check className="w-3.5 h-3.5 text-neutral-900 dark:text-white stroke-[2.5]" />}
-              </DropdownMenu.Item>
-            );
-          })}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: 8 }}
+            transition={{ type: "spring", stiffness: 450, damping: 28 }}
+            className="w-40 rounded-[20px] p-1.5 z-50 border shadow-[0_16px_40px_rgba(0,0,0,0.3)] bg-white/95 dark:bg-[#242528]/95 backdrop-blur-2xl border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 focus:outline-none"
+          >
+            {MODES.map((m) => {
+              const isSelected = m.id === mode;
+              return (
+                <DropdownMenu.Item
+                  key={m.id}
+                  onSelect={() => onChange(m.id)}
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs cursor-pointer outline-none transition-all ${
+                    isSelected
+                      ? "bg-neutral-100 dark:bg-white/10 font-semibold text-neutral-900 dark:text-white"
+                      : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white font-medium"
+                  }`}
+                >
+                  <span>{m.label}</span>
+                  {isSelected && (
+                    <motion.span
+                      initial={{ scale: 0.6, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                    >
+                      <Check className="w-3.5 h-3.5 text-neutral-900 dark:text-white stroke-[2.5]" />
+                    </motion.span>
+                  )}
+                </DropdownMenu.Item>
+              );
+            })}
+          </motion.div>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

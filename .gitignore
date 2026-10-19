@@ -23,3 +23,6 @@ Thumbs.db
 !.env.example
 data/
 .backup-tests/
+.neon
+.agents/
+skills-lock.json
