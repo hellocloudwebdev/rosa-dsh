@@ -141,10 +141,10 @@ export function ModelMenu({
           ) : activeModel ? (
             <>
               <AceStudioIcon className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate max-w-[120px] sm:max-w-[160px] font-medium">
+              <span className="truncate max-w-[100px] xs:max-w-[130px] sm:max-w-[160px] font-medium">
                 {activeModel.displayName || activeModel.modelId}
               </span>
-              <span className="text-[10px] text-neutral-400 font-normal hidden sm:inline">
+              <span className="text-[10px] text-neutral-400 font-normal hidden md:inline">
                 {activeEffort}
               </span>
             </>

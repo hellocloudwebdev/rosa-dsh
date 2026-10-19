@@ -160,23 +160,37 @@ export function PrimaryWorkspace({
   return (
     <div className="flex-1 min-w-0 h-full flex flex-col bg-[var(--bg-app)] transition-colors duration-300 relative overflow-hidden">
       {/* Scrollable conversation thread */}
-      <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
-        <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div
+        ref={listRef}
+        onScroll={handleScroll}
+        className={`flex-1 overflow-y-auto px-4 md:px-8 flex flex-col ${
+          messages.length === 0 && !isLoading
+            ? "justify-center items-center min-h-full py-8 md:py-12"
+            : "py-6"
+        }`}
+      >
+        <div
+          className={`w-full ${
+            messages.length === 0 && !isLoading
+              ? "max-w-[660px] my-auto flex flex-col items-center"
+              : "max-w-4xl mx-auto space-y-6"
+          }`}
+        >
           {/* Empty state when no conversation */}
           {messages.length === 0 && !isLoading && (
-            <div className="py-8 sm:py-12 text-center max-w-xl mx-auto w-full px-2">
+            <div className="w-full text-center flex flex-col items-center">
               {/* Starburst icon from reference image */}
               <div className="flex justify-center mb-3">
                 <StarburstIcon className="w-8 h-8 text-[var(--text-primary)]" />
               </div>
 
               {/* Editorial Serif Headline matching reference image */}
-              <h1 className="font-serif text-3xl sm:text-[34px] font-normal tracking-tight text-[var(--text-primary)] mb-6">
+              <h1 className="font-serif text-3xl sm:text-[36px] font-normal tracking-tight text-[var(--text-primary)] mb-7">
                 Create Emails Worth Opening
               </h1>
 
               {/* Central Floating Composer in Empty State matching reference image */}
-              <div className="mb-6 text-left">
+              <div className="w-full mb-6 text-left">
                 <Composer
                   value={prompt}
                   onValueChange={onPromptChange}
@@ -204,7 +218,7 @@ export function PrimaryWorkspace({
               {models.length === 0 && (
                 <div
                   data-testid="no-models-cta-card"
-                  className="mb-6 flex flex-col items-center justify-center p-6 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-panel-2)] shadow-xs"
+                  className="w-full mb-6 flex flex-col items-center justify-center p-6 rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-panel-2)] shadow-xs"
                 >
                   <div className="w-10 h-10 rounded-xl bg-[#c6f232] text-black flex items-center justify-center mb-3">
                     <Key className="w-5 h-5" />
@@ -228,11 +242,11 @@ export function PrimaryWorkspace({
               )}
 
               {/* Suggested for today */}
-              <div className="text-left w-full mt-2">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">
+              <div className="w-full text-left mt-1">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2.5">
                   Suggested for today
                 </h3>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {SUGGESTED_FOR_TODAY.map((s, i) => {
                     const Icon = s.icon;
                     return (
@@ -242,14 +256,14 @@ export function PrimaryWorkspace({
                         onClick={() => {
                           onPromptChange(s.prompt);
                         }}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-panel-2)] hover:border-[#c6f232] hover:bg-[var(--hover-overlay)] transition-all cursor-pointer text-left flex items-center gap-3 group shadow-2xs"
+                        className="w-full px-4 py-3 rounded-2xl border border-[var(--border-strong)] bg-white dark:bg-[#1c1c1f] hover:border-[#c6f232] hover:bg-neutral-50/80 dark:hover:bg-white/5 transition-all cursor-pointer text-left flex items-center gap-3.5 group shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
                       >
-                        <div className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] shrink-0 flex items-center justify-center">
+                        <div className="w-4 h-4 text-neutral-400 group-hover:text-neutral-800 dark:group-hover:text-white shrink-0 flex items-center justify-center">
                           <Icon className="w-4 h-4" />
                         </div>
                         <div className="text-xs leading-relaxed truncate">
-                          <strong className="font-semibold text-[var(--text-primary)]">{s.action} </strong>
-                          <span className="text-[var(--text-secondary)]">{s.description}</span>
+                          <strong className="font-semibold text-neutral-900 dark:text-neutral-100">{s.action} </strong>
+                          <span className="text-neutral-500 dark:text-neutral-400">{s.description}</span>
                         </div>
                       </button>
                     );

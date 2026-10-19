@@ -675,7 +675,7 @@ export function App() {
 
   return (
     <div
-      className={`w-screen h-screen flex overflow-hidden select-none font-sans text-[var(--text-primary)] transition-colors duration-300 ${
+      className={`w-screen h-screen flex overflow-hidden select-none font-sans text-[var(--text-primary)] bg-[var(--bg-app)] transition-colors duration-300 ${
         theme === "dark" ? "theme-dark" : "theme-light"
       }`}
     >
