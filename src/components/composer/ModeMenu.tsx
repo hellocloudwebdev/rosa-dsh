@@ -34,7 +34,7 @@ export function ModeMenu({ mode, onChange }: ModeMenuProps) {
           whileTap={{ scale: 0.94 }}
           type="button"
           transition={{ type: "spring", stiffness: 500, damping: 32 }}
-          className="flex items-center gap-1.5 h-8.5 px-3.5 rounded-full text-xs font-semibold cursor-pointer outline-none transition-colors border bg-white dark:bg-[#242528] hover:bg-neutral-50 dark:hover:bg-[#2c2d31] border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-neutral-100 shadow-2xs select-none"
+          className="flex items-center justify-between gap-2 h-8.5 px-4 min-w-[88px] sm:min-w-[96px] rounded-full text-xs font-semibold cursor-pointer outline-none transition-colors border bg-[#f2f2f0] dark:bg-[#242b25] hover:bg-[#e7e7e4] dark:hover:bg-[#2e372f] border-neutral-200/70 dark:border-white/10 text-neutral-800 dark:text-neutral-100 shadow-2xs select-none"
         >
           <AnimatePresence mode="wait" initial={false}>
             <motion.span
@@ -43,11 +43,12 @@ export function ModeMenu({ mode, onChange }: ModeMenuProps) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 4 }}
               transition={{ duration: 0.15 }}
+              className="text-left"
             >
               {active.label}
             </motion.span>
           </AnimatePresence>
-          <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+          <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
         </motion.button>
       </DropdownMenu.Trigger>
 

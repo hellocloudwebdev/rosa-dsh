@@ -127,34 +127,34 @@ export function ModelMenu({
           type="button"
           disabled={disabled}
           transition={{ type: "spring", stiffness: 500, damping: 32 }}
-          className={`flex items-center gap-2 h-8.5 px-3.5 rounded-full text-xs font-semibold cursor-pointer outline-none transition-colors border bg-white dark:bg-[#242528] hover:bg-neutral-50 dark:hover:bg-[#2c2d31] border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-neutral-100 shadow-2xs select-none ${
+          className={`flex items-center justify-between gap-2.5 h-8.5 px-4 min-w-[180px] sm:min-w-[220px] max-w-[320px] rounded-full text-xs font-semibold cursor-pointer outline-none transition-colors border bg-[#f2f2f0] dark:bg-[#242b25] hover:bg-[#e7e7e4] dark:hover:bg-[#2e372f] border-neutral-200/70 dark:border-white/10 text-neutral-800 dark:text-neutral-100 shadow-2xs select-none ${
             disabled ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >
           {isAuto ? (
-            <div className="flex items-center gap-1.5 font-medium">
+            <div className="flex items-center gap-2 font-medium">
               <span>Auto</span>
               <div className="w-5 h-3 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center px-0.5">
                 <div className="w-2 h-2 rounded-full bg-white ml-auto" />
               </div>
             </div>
           ) : activeModel ? (
-            <>
+            <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
               <AceStudioIcon className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate max-w-[100px] xs:max-w-[130px] sm:max-w-[160px] font-medium">
+              <span className="truncate max-w-[140px] sm:max-w-[190px] font-medium text-left">
                 {activeModel.displayName || activeModel.modelId}
               </span>
-              <span className="text-[10px] text-neutral-400 font-normal hidden md:inline">
+              <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-normal shrink-0">
                 {activeEffort}
               </span>
-            </>
+            </div>
           ) : (
-            <>
+            <div className="flex items-center gap-2">
               <AceStudioIcon className="w-3.5 h-3.5 shrink-0" />
               <span className="font-medium">Select Model</span>
-            </>
+            </div>
           )}
-          <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+          <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0 ml-1" />
         </motion.button>
       </DropdownMenu.Trigger>
 

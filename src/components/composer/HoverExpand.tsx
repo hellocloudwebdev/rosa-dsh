@@ -21,10 +21,10 @@ export function HoverExpand({ icon, label, ariaLabel, onClick, variant = "dark" 
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className={`flex items-center h-8 rounded-full px-2 cursor-pointer outline-none transition-colors ${
+      className={`flex items-center h-8.5 rounded-full px-2.5 cursor-pointer outline-none transition-all border ${
         variant === "light"
-          ? "bg-[#f2f2f0] hover:bg-[#e7e7e4] text-neutral-700"
-          : "bg-[#2e372f] hover:bg-[#39443b] text-neutral-200"
+          ? "bg-[#f2f2f0] hover:bg-[#e7e7e4] text-neutral-800 border-neutral-200/70"
+          : "bg-[#242b25] hover:bg-[#2e372f] text-neutral-100 border-white/5"
       }`}
     >
       {icon}

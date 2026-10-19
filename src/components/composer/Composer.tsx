@@ -189,15 +189,15 @@ export function Composer({
                 <motion.button
                   whileTap={{ scale: 0.94 }}
                   type="button"
-                  className={`flex items-center gap-1 h-8 px-2.5 rounded-full text-xs font-medium cursor-pointer outline-none transition-colors border shrink-0 ${
+                  className={`flex items-center gap-1.5 h-8.5 px-3 rounded-full text-xs font-semibold cursor-pointer outline-none transition-colors border shrink-0 ${
                     isLight
-                      ? "bg-[#f2f2f0] hover:bg-[#e7e7e4] text-neutral-700 border-neutral-200/70"
-                      : "bg-[#2e372f] hover:bg-[#39443b] text-neutral-200 border-white/5"
+                      ? "bg-[#f2f2f0] hover:bg-[#e7e7e4] text-neutral-800 border-neutral-200/70"
+                      : "bg-[#242b25] hover:bg-[#2e372f] text-neutral-100 border-white/5"
                   }`}
                   title="Sampling Temperature & Settings"
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline font-mono">{temperature.toFixed(1)}</span>
+                  <span className="font-mono">{temperature.toFixed(1)}</span>
                 </motion.button>
               </Popover.Trigger>
               <Popover.Portal>
@@ -244,7 +244,7 @@ export function Composer({
               whileTap={{ scale: 0.92 }}
               type="button"
               onClick={onCancel}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-full bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 h-8.5 px-3.5 rounded-full bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer shadow-xs"
               title="Stop generation"
             >
               <Square className="w-3 h-3 fill-current" />
@@ -257,14 +257,14 @@ export function Composer({
               type="button"
               onClick={onSubmit}
               disabled={!value.trim()}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+              className={`w-8.5 h-8.5 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs ${
                 isLight
                   ? value.trim()
                     ? "bg-[#18181b] text-white hover:bg-neutral-800"
-                    : "bg-[#f2f2f0] text-neutral-300"
+                    : "bg-[#f2f2f0] text-neutral-400 border border-neutral-200/70"
                   : value.trim()
                     ? "bg-white text-neutral-900 hover:bg-neutral-200"
-                    : "bg-[#2e372f] text-neutral-500"
+                    : "bg-[#242b25] text-neutral-500 border border-white/5"
               }`}
               aria-label="Send"
             >
