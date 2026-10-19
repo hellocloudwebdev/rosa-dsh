@@ -123,7 +123,7 @@ export function App() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<Mode>("Chat");
+  const [mode, setMode] = useState<Mode>("Ask");
   const [temperature, setTemperature] = useState(0.7);
 
   // Abort Controllers for in-flight streams

@@ -10,7 +10,7 @@ describe("PrimaryWorkspace Empty-State CTA", () => {
     prompt: "",
     onPromptChange: vi.fn(),
     onSubmit: vi.fn(),
-    mode: "chat" as const,
+    mode: "Ask" as const,
     onModeChange: vi.fn(),
     selectedModel: null,
     onSelectModel: vi.fn(),

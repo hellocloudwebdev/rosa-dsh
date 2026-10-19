@@ -192,6 +192,7 @@ export function PrimaryWorkspace({
                   selectedModel={selectedModel}
                   onSelectModel={onSelectModel}
                   onOpenProvidersModal={onOpenProvidersModal}
+                  onToggleFavourite={onToggleFavourite}
                   paneCount={paneCount}
                   temperature={temperature}
                   onTemperatureChange={onTemperatureChange}
@@ -484,6 +485,7 @@ export function PrimaryWorkspace({
               selectedModel={selectedModel}
               onSelectModel={onSelectModel}
               onOpenProvidersModal={onOpenProvidersModal}
+              onToggleFavourite={onToggleFavourite}
               paneCount={paneCount}
               temperature={temperature}
               onTemperatureChange={onTemperatureChange}
