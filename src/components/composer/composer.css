@@ -10,6 +10,10 @@
 .rosa-chat-theme {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  /* Reference parity: the surface eases between palettes. */
+  transition:
+    background-color 0.28s ease,
+    color 0.22s ease;
 }
 
 .rosa-chat-theme[data-theme="dark"] {
@@ -434,7 +438,7 @@
   transition: all 0.18s ease;
 }
 
-.rosa-chat-theme .submit-btn:hover:not(:disabled),
+.rosa-chat-theme .submit-btn:hover,
 .rosa-chat-theme .submit-btn.ready {
   background: var(--submit-ready-bg);
   border-color: var(--submit-ready-border);
@@ -784,12 +788,4 @@
 
 .rosa-chat-theme .composer-scroll {
   scrollbar-width: thin;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rosa-chat-theme .pill-control,
-  .rosa-chat-theme .glass-popover,
-  .rosa-chat-theme .search-row-wrap {
-    transition-duration: 0.01ms;
-  }
 }
