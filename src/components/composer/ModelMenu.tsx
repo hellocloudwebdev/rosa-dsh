@@ -10,6 +10,10 @@ import {
 
 type ModelFilterTab = "fav" | "all";
 
+/** The catalogue shows at most nine rows, and never fewer than three. */
+const MAX_ROWS = 9;
+const MIN_ROWS = 3;
+
 export interface ModelSelection {
   providerId: string;
   modelId: string;
@@ -57,6 +61,8 @@ export function ModelMenu({
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const hoveringRowRef = useRef(false);
   const hoveringEffortRef = useRef(false);
   const hideEffortTimerRef = useRef<number | null>(null);
@@ -65,6 +71,9 @@ export function ModelMenu({
   // viewport: measure the anchor on open and flip below when space is short.
   const [placement, setPlacement] = useState<"above" | "below">("above");
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
+  const [chromeHeight, setChromeHeight] = useState<number | null>(null);
+  const [rowHeight, setRowHeight] = useState(38);
+  const [rowGap, setRowGap] = useState(2);
 
   useEffect(() => {
     if (!open) return;
@@ -76,11 +85,14 @@ export function ModelMenu({
       const margin = 12;
       const spaceAbove = rect.top - margin;
       const spaceBelow = window.innerHeight - rect.bottom - margin;
-      const preferred = 380;
-      const next = spaceAbove >= preferred || spaceAbove >= spaceBelow ? "above" : "below";
+      // Stay above whenever at least a usable list (min rows) fits there;
+      // flip below only when the space above is genuinely the tighter side.
+      const chrome = chromeHeight ?? 149;
+      const minimum = chrome + MIN_ROWS * rowHeight + (MIN_ROWS - 1) * rowGap;
+      const next = spaceAbove >= minimum && spaceAbove >= spaceBelow * 0.6 ? "above" : "below";
       setPlacement(next);
       const space = next === "above" ? spaceAbove : spaceBelow;
-      setAvailableHeight(Math.max(180, Math.min(space, 520)));
+      setAvailableHeight(Math.max(0, space));
     };
 
     measure();
@@ -90,7 +102,7 @@ export function ModelMenu({
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
-  }, [open]);
+  }, [open, chromeHeight, rowHeight, rowGap]);
 
   const clearHideEffortTimeout = useCallback(() => {
     if (hideEffortTimerRef.current !== null) {
@@ -170,6 +182,49 @@ export function ModelMenu({
   }, [visibleModels, hoveredKey]);
 
   const isEffortMenuVisible = open && searchQuery.trim().length === 0 && hoveredModel !== null;
+
+  // The catalogue shows at most nine rows and never fewer than three: rows are
+  // 38px tall with a 2px gap, so the list is sized by row count and only
+  // shrinks below nine when the viewport has no room for them.
+  const listMaxHeightPx = useMemo(() => {
+    const ROW = rowHeight;
+    const GAP = rowGap;
+    const ideal = MAX_ROWS * ROW + (MAX_ROWS - 1) * GAP;
+    if (availableHeight === null) return ideal;
+    // Reserve the panel chrome (search row, Auto row, filter bar, footer and
+    // padding), measured from the rendered panel so the list fills the rest.
+    const budget = availableHeight - (chromeHeight ?? 120);
+    const rows = Math.floor((budget + GAP) / (ROW + GAP));
+    const clamped = Math.max(MIN_ROWS, Math.min(MAX_ROWS, rows));
+    return clamped * ROW + (clamped - 1) * GAP;
+  }, [availableHeight, chromeHeight, rowHeight, rowGap]);
+
+  // Measure everything in the panel except the scrolling row list, plus the
+  // real row height and gap, so the cap tracks the rendered layout.
+  useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
+    const list = listRef.current;
+    if (!panel || !list) return;
+    // Sum the siblings rather than differencing heights: the list is already
+    // capped by the time this runs, so a difference would feed back on itself.
+    let chrome = 0;
+    for (const child of Array.from(panel.children)) {
+      if (child === list) continue;
+      chrome += (child as HTMLElement).getBoundingClientRect().height;
+    }
+    const styles = getComputedStyle(panel);
+    chrome += parseFloat(styles.paddingTop || "0") + parseFloat(styles.paddingBottom || "0");
+    if (chrome > 0 && Math.abs(chrome - (chromeHeight ?? 0)) > 0.5) setChromeHeight(chrome);
+    const row = list.querySelector<HTMLElement>(".model-row");
+    if (row) {
+      const h = row.getBoundingClientRect().height;
+      if (h > 0 && Math.abs(h - rowHeight) > 0.5) setRowHeight(h);
+    }
+    const listStyles = getComputedStyle(list);
+    const gap = parseFloat(listStyles.rowGap || listStyles.gap || "0");
+    if (Number.isFinite(gap) && Math.abs(gap - rowGap) > 0.5) setRowGap(gap);
+  }, [open, searchRevealed, filterTab, chromeHeight, rowHeight, rowGap]);
 
   const selectModel = (m: ModelWithProvider) => {
     onSelectModel({
@@ -279,10 +334,11 @@ export function ModelMenu({
 
       {/* Popover */}
       <div
+        ref={panelRef}
         className={`glass-popover ${open ? "popover-visible" : "popover-hidden"} absolute left-0 ${
           placement === "above" ? "bottom-0" : "top-[calc(100%+8px)]"
         } w-[256px] rounded-[20px] p-2 z-30 flex flex-col`}
-        style={availableHeight ? { maxHeight: `${availableHeight}px` } : undefined}
+        style={availableHeight ? { maxHeight: `${Math.min(availableHeight, 560)}px` } : undefined}
       >
         {/* Collapsible search */}
         <div
@@ -415,8 +471,9 @@ export function ModelMenu({
 
         {/* Model rows */}
         <div
+          ref={listRef}
           className="flex flex-col gap-0.5 min-h-0 flex-1 overflow-y-auto composer-scroll"
-          style={{ maxHeight: availableHeight ? undefined : "300px" }}
+          style={{ maxHeight: `${listMaxHeightPx}px` }}
         >
           {visibleModels.length === 0 ? (
             <div
