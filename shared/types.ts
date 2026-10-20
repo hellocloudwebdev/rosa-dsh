@@ -16,7 +16,8 @@ export type ProviderKind =
   | "groq"
   | "mistral"
   | "cohere"
-  | "openrouter";
+  | "openrouter"
+  | "neon-ai-gateway";
 
 export interface ProviderPreset {
   kind: ProviderKind;

@@ -21,6 +21,13 @@ import { SuggestedList } from "./SuggestedList";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { ModelMenu } from "./composer/ModelMenu";
 import { ComparisonPane } from "./ComparisonPane";
+import {
+  readAutoRouting,
+  readEfforts,
+  writeAutoRouting,
+  writeEfforts,
+  type EffortLevel,
+} from "./composer/effort";
 
 interface PrimaryWorkspaceProps {
   messages: Msg[];
@@ -70,6 +77,24 @@ export function PrimaryWorkspace({
   const [copiedAll, setCopiedAll] = useState(false);
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
   const [banner, setBanner] = useState(true);
+
+  // Composer model preferences, shared by the prompt card and the pane bar.
+  const [efforts, setEfforts] = useState<Record<string, EffortLevel>>(readEfforts);
+  const [autoRouting, setAutoRouting] = useState(readAutoRouting);
+  const [openPaneMenu, setOpenPaneMenu] = useState<number | null>(null);
+
+  const handleSelectEffort = (providerId: string, modelId: string, effort: EffortLevel) => {
+    setEfforts((prev) => {
+      const next = { ...prev, [`${providerId}:${modelId}`]: effort };
+      writeEfforts(next);
+      return next;
+    });
+  };
+
+  const handleAutoRoutingChange = (enabled: boolean) => {
+    writeAutoRouting(enabled);
+    setAutoRouting(enabled);
+  };
 
   const activePanes = useMemo(() => panes.slice(0, paneCount), [panes, paneCount]);
 
@@ -347,6 +372,10 @@ export function PrimaryWorkspace({
             onSelectModel={onSelectModel}
             onOpenProvidersModal={onOpenProvidersModal}
             onToggleFavourite={onToggleFavourite}
+            efforts={efforts}
+            onSelectEffort={handleSelectEffort}
+            autoRouting={autoRouting}
+            onAutoRoutingChange={handleAutoRoutingChange}
             paneCount={paneCount}
             temperature={temperature}
             onTemperatureChange={onTemperatureChange}
@@ -360,6 +389,7 @@ export function PrimaryWorkspace({
             <UpgradeBanner
               onDismiss={() => setBanner(false)}
               onUpgrade={onOpenProvidersModal}
+              theme={isLight ? "light" : "dark"}
             />
           )}
         </AnimatePresence>
@@ -382,9 +412,11 @@ export function PrimaryWorkspace({
         </button>
       )}
 
-      {/* Pane Model Bar when in Multi-Pane Mode */}
+      {/* Pane Model Bar when in Multi-Pane Mode. Popovers open upward out of the
+          bar, so this row wraps instead of clipping them behind an overflow
+          container. */}
       {paneCount > 1 && (
-        <div className="px-6 py-2 border-t border-[var(--border-subtle)] bg-[var(--bg-panel)] flex items-center justify-between gap-3 overflow-x-auto shrink-0 mt-auto">
+        <div className="px-6 py-2 border-t border-[var(--border-subtle)] bg-[var(--bg-panel)] flex items-center justify-between gap-3 flex-wrap shrink-0 mt-auto">
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5 shrink-0">
               <Scale className="w-3.5 h-3.5 text-[var(--lime-badge)]" />
@@ -399,7 +431,13 @@ export function PrimaryWorkspace({
                   onSelectModel={(m) => onUpdatePaneModel(idx, m)}
                   onOpenProvidersModal={onOpenProvidersModal}
                   onToggleFavourite={onToggleFavourite}
-                  variant={isLight ? "light" : "dark"}
+                  efforts={efforts}
+                  onSelectEffort={handleSelectEffort}
+                  auto={false}
+                  onAutoChange={() => undefined}
+                  open={openPaneMenu === idx}
+                  onOpenChange={(next) => setOpenPaneMenu(next ? idx : null)}
+                  theme={isLight ? "light" : "dark"}
                 />
               </div>
             ))}

@@ -83,6 +83,15 @@ export const MIGRATIONS: Array<{ version: number; statements: string[] }> = [
          PRIMARY KEY (user_id, model_ref)
        )`,
 
+      `CREATE TABLE IF NOT EXISTS folders (
+         id TEXT PRIMARY KEY,
+         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+         name TEXT NOT NULL,
+         parent_id TEXT,
+         created_at INTEGER NOT NULL
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_folders_user ON folders(user_id)`,
+
       `CREATE TABLE IF NOT EXISTS conversations (
          id TEXT PRIMARY KEY,
          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -96,15 +105,6 @@ export const MIGRATIONS: Array<{ version: number; statements: string[] }> = [
          updated_at INTEGER NOT NULL
        )`,
       `CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_id, updated_at DESC)`,
-
-      `CREATE TABLE IF NOT EXISTS folders (
-         id TEXT PRIMARY KEY,
-         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-         name TEXT NOT NULL,
-         parent_id TEXT,
-         created_at INTEGER NOT NULL
-       )`,
-      `CREATE INDEX IF NOT EXISTS idx_folders_user ON folders(user_id)`,
 
       `CREATE TABLE IF NOT EXISTS messages (
          id TEXT PRIMARY KEY,

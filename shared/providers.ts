@@ -132,6 +132,20 @@ export const PROVIDER_PRESETS: Record<ProviderKind, ProviderPreset> = {
     notes:
       "OpenRouter exposes rich per-model metadata (context length, pricing, modality). Only provider-reported fields are surfaced.",
   },
+  "neon-ai-gateway": {
+    kind: "neon-ai-gateway",
+    label: "Neon AI Gateway",
+    defaultBaseUrl: "https://br-autumn-heart-aoorilq7-api.ai.c-2.ap-southeast-1.aws.neon.tech/v1",
+    modelsPath: "/models",
+    chatPath: "/chat/completions",
+    authScheme: "bearer",
+    authHeader: "authorization",
+    supportsListing: true,
+    supportsStreaming: true,
+    reportsUsage: true,
+    notes: "One API for frontier and open-source models powered by Databricks on Neon.",
+    docsUrl: "https://neon.com/docs/ai-gateway/overview",
+  },
 };
 
 export const PRESET_LIST: ProviderPreset[] = Object.values(PROVIDER_PRESETS);

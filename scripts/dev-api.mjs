@@ -50,7 +50,13 @@ let child = null;
 let stopping = false;
 
 function start() {
-  child = spawn(process.execPath, [entry], {
+  const args = [];
+  const envFile = path.join(root, ".env");
+  if (fs.existsSync(envFile)) {
+    args.push(`--env-file=${envFile}`);
+  }
+  args.push(entry);
+  child = spawn(process.execPath, args, {
     cwd: root,
     stdio: "inherit",
     env: process.env,

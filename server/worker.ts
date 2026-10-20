@@ -92,7 +92,7 @@ function withSecurityHeaders(response: Response): Response {
   if (!headers.has("content-security-policy")) {
     headers.set(
       "content-security-policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev; connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://*.supabase.co https://*.pooler.supabase.com https://api.openai.com https://api.anthropic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https://*.clerk.com https://img.clerk.com https://*.githubusercontent.com https://*.googleusercontent.com; frame-src 'self' https://*.clerk.com https://*.clerk.accounts.dev;",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev; connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://*.neon.tech https://*.aws.neon.tech https://*.supabase.co https://*.pooler.supabase.com https://api.openai.com https://api.anthropic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https://*.clerk.com https://img.clerk.com https://*.githubusercontent.com https://*.googleusercontent.com; frame-src 'self' https://*.clerk.com https://*.clerk.accounts.dev;",
     );
   }
 
@@ -111,15 +111,14 @@ export default {
     if (url.pathname.startsWith("/api")) {
       let driver: SqlDriver;
 
-      // 1. Supabase / PostgreSQL over HTTP
+      // 1. Neon / Lakebase Postgres / Supabase over HTTP
       if (
-        env.SUPABASE_DB_URL ||
-        (env.DATABASE_URL &&
-          (env.DATABASE_URL.includes("postgres") || env.DATABASE_URL.includes("supabase")))
+        env.DATABASE_URL ||
+        env.SUPABASE_DB_URL
       ) {
-        const { SupabaseDriver } = await import("./db/supabase.js");
-        driver = new SupabaseDriver({
-          connectionString: (env.SUPABASE_DB_URL || env.DATABASE_URL) as string,
+        const { NeonDriver } = await import("./db/neon.js");
+        driver = new NeonDriver({
+          connectionString: (env.DATABASE_URL || env.SUPABASE_DB_URL) as string,
         });
       } else if (env.rosa_db) {
         // 2. Cloudflare D1

@@ -1,423 +1,577 @@
-import { useState, useMemo } from "react";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronDown, Search, Star, Plus, Eye, Wrench, Sparkles } from "lucide-react";
-import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ModelWithProvider } from "@shared/types.js";
-import { ModelIcon, AceStudioIcon } from "./icons";
+import { CheckmarkIcon, ProviderBadge } from "./glyphs";
+import {
+  DEFAULT_EFFORT,
+  EFFORT_LEVELS,
+  modelKey,
+  type EffortLevel,
+} from "./effort";
+
+type ModelFilterTab = "fav" | "all";
+
+export interface ModelSelection {
+  providerId: string;
+  modelId: string;
+  label?: string;
+}
 
 interface ModelMenuProps {
   models: ModelWithProvider[];
   selectedModel: { providerId: string; modelId: string } | null;
-  onSelectModel: (m: { providerId: string; modelId: string; label?: string }) => void;
+  onSelectModel: (m: ModelSelection) => void;
   onOpenProvidersModal: () => void;
   onToggleFavourite?: (providerId: string, modelId: string, current: boolean) => void;
-  variant?: "dark" | "light";
-  disabled?: boolean;
+  efforts: Record<string, EffortLevel>;
+  onSelectEffort: (providerId: string, modelId: string, effort: EffortLevel) => void;
+  auto: boolean;
+  onAutoChange: (enabled: boolean) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  theme: "dark" | "light";
 }
 
-type FilterTag = "all" | "fav" | "vision" | "tools";
-
+/**
+ * Model pill plus its popover: collapsible search, Auto routing switch, the
+ * fav/all segmented filter, and the effort flyout that tracks the hovered row.
+ */
 export function ModelMenu({
   models,
   selectedModel,
   onSelectModel,
   onOpenProvidersModal,
   onToggleFavourite,
-  disabled = false,
+  efforts,
+  onSelectEffort,
+  auto,
+  onAutoChange,
+  open,
+  onOpenChange,
+  theme,
 }: ModelMenuProps) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [filterTag, setFilterTag] = useState<FilterTag>("all");
-  const [isAuto, setIsAuto] = useState(false);
-  const [selectedEffort, setSelectedEffort] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchRevealed, setSearchRevealed] = useState(false);
+  const [filterTab, setFilterTab] = useState<ModelFilterTab>("fav");
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [pointerReady, setPointerReady] = useState(false);
 
-  // Find active model object
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const hoveringRowRef = useRef(false);
+  const hoveringEffortRef = useRef(false);
+  const hideEffortTimerRef = useRef<number | null>(null);
+
+  const clearHideEffortTimeout = useCallback(() => {
+    if (hideEffortTimerRef.current !== null) {
+      window.clearTimeout(hideEffortTimerRef.current);
+      hideEffortTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleHideEffort = useCallback(() => {
+    clearHideEffortTimeout();
+    hideEffortTimerRef.current = window.setTimeout(() => {
+      if (!hoveringEffortRef.current && !hoveringRowRef.current) {
+        setHoveredKey(null);
+      }
+    }, 60);
+  }, [clearHideEffortTimeout]);
+
+  useEffect(() => () => clearHideEffortTimeout(), [clearHideEffortTimeout]);
+
+  // Reveal the search field shortly after opening, so the panel does not jump.
+  useEffect(() => {
+    if (!open) {
+      setSearchRevealed(false);
+      setSearchQuery("");
+      setFilterTab("fav");
+      setHoveredKey(null);
+      setPointerReady(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setSearchRevealed(true), 160);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+
   const activeModel = useMemo(() => {
-    if (!selectedModel) return models[0] || null;
+    if (!selectedModel) return null;
     return (
       models.find(
         (m) =>
           m.providerId === selectedModel.providerId && m.modelId === selectedModel.modelId,
-      ) || null
+      ) ?? null
     );
   }, [models, selectedModel]);
 
-  // Check if a model supports vision
-  const checkVision = (m: ModelWithProvider) =>
-    m.capabilities?.vision === "provider" ||
-    m.capabilities?.vision === "inferred" ||
-    m.capabilities?.inputModalities?.includes("image");
+  const activeEffort = activeModel
+    ? (efforts[modelKey(activeModel.providerId, activeModel.modelId)] ?? DEFAULT_EFFORT)
+    : DEFAULT_EFFORT;
 
-  // Filter models by query and tag
-  const filteredModels = useMemo(() => {
-    let list = models;
-    if (filterTag === "fav") {
-      list = list.filter((m) => m.favourite);
-    } else if (filterTag === "vision") {
-      list = list.filter(checkVision);
-    } else if (filterTag === "tools") {
-      list = list.filter(
-        (m) => m.capabilities?.tools === "provider" || m.capabilities?.tools === "inferred",
-      );
-    }
+  const favCount = useMemo(() => models.filter((m) => m.favourite).length, [models]);
 
-    if (!query.trim()) return list;
-    const q = query.toLowerCase();
-    return list.filter(
-      (m) =>
+  const visibleModels = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return models.filter((m) => {
+      const matchesTab = filterTab === "fav" ? m.favourite : true;
+      if (!matchesTab) return false;
+      if (!q) return true;
+      return (
         m.displayName.toLowerCase().includes(q) ||
         m.modelId.toLowerCase().includes(q) ||
-        m.provider?.displayName?.toLowerCase().includes(q),
-    );
-  }, [models, query, filterTag]);
+        (m.provider?.displayName ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [models, filterTab, searchQuery]);
 
-  // Order sections: Favourites FIRST -> Vision SECOND -> All Models THIRD
-  const orderedSections = useMemo(() => {
-    if (filterTag === "fav") {
-      return [{ id: "fav", title: "Favourites", icon: Star, items: filteredModels }];
-    }
-    if (filterTag === "vision") {
-      return [{ id: "vision", title: "Vision Models", icon: Eye, items: filteredModels }];
-    }
-    if (filterTag === "tools") {
-      return [{ id: "tools", title: "Tools / Function Calling", icon: Wrench, items: filteredModels }];
-    }
+  const hoveredModel = useMemo(
+    () =>
+      hoveredKey ? (models.find((m) => modelKey(m.providerId, m.modelId) === hoveredKey) ?? null) : null,
+    [models, hoveredKey],
+  );
 
-    // Default "all" view:
-    const favs = filteredModels.filter((m) => m.favourite);
-    const vision = filteredModels.filter((m) => !m.favourite && checkVision(m));
-    const others = filteredModels.filter((m) => !m.favourite && !checkVision(m));
+  // Track the hovered row so the effort flyout glides vertically with it.
+  const effortBottomOffsetPx = useMemo(() => {
+    if (!hoveredKey) return 0;
+    const idx = visibleModels.findIndex((m) => modelKey(m.providerId, m.modelId) === hoveredKey);
+    if (idx < 0) return 0;
+    const rowsFromBottom = visibleModels.length - 1 - idx;
+    return rowsFromBottom <= 1 ? 0 : Math.min(96, (rowsFromBottom - 1) * 24);
+  }, [visibleModels, hoveredKey]);
 
-    const sections = [];
-    if (favs.length > 0) {
-      sections.push({ id: "fav", title: "Favourites", icon: Star, items: favs });
-    }
-    if (vision.length > 0) {
-      sections.push({ id: "vision", title: "Vision Models", icon: Eye, items: vision });
-    }
-    if (others.length > 0 || sections.length === 0) {
-      sections.push({
-        id: "all",
-        title: favs.length > 0 || vision.length > 0 ? "All Models" : "Available Models",
-        icon: Sparkles,
-        items: others.length > 0 ? others : filteredModels,
-      });
-    }
-    return sections;
-  }, [filteredModels, filterTag]);
+  const isEffortMenuVisible = open && searchQuery.trim().length === 0 && hoveredModel !== null;
 
-  const activeEffort = activeModel ? selectedEffort[activeModel.modelId] || "High" : "High";
+  const selectModel = (m: ModelWithProvider) => {
+    onSelectModel({
+      providerId: m.providerId,
+      modelId: m.modelId,
+      label: m.displayName || m.modelId,
+    });
+    onAutoChange(false);
+    onOpenChange(false);
+  };
 
   return (
-    <DropdownMenu.Root
-      open={open}
-      onOpenChange={(o) => {
-        if (disabled) return;
-        setOpen(o);
-        if (!o) {
-          setQuery("");
-          setFilterTag("all");
-        }
-      }}
-    >
-      <DropdownMenu.Trigger asChild>
-        <motion.button
-          layout
-          whileTap={{ scale: 0.94 }}
-          type="button"
-          disabled={disabled}
-          transition={{ type: "spring", stiffness: 500, damping: 32 }}
-          className={`flex items-center justify-between gap-2.5 h-8.5 px-4 min-w-[180px] sm:min-w-[220px] max-w-[320px] rounded-full text-xs font-semibold cursor-pointer outline-none transition-colors border bg-[#f2f2f0] dark:bg-[#242b25] hover:bg-[#e7e7e4] dark:hover:bg-[#2e372f] border-neutral-200/70 dark:border-white/10 text-neutral-800 dark:text-neutral-100 shadow-2xs select-none ${
-            disabled ? "opacity-50 cursor-not-allowed" : ""
-          }`}
+    <div className="rosa-chat-theme relative inline-flex items-center" data-theme={theme}>
+      {auto ? (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Auto model routing"
+          aria-expanded={open}
+          onClick={() => onOpenChange(!open)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpenChange(!open);
+            }
+          }}
+          className="auto-trigger-btn"
         >
-          {isAuto ? (
-            <div className="flex items-center gap-2 font-medium">
-              <span>Auto</span>
-              <div className="w-5 h-3 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center px-0.5">
-                <div className="w-2 h-2 rounded-full bg-white ml-auto" />
-              </div>
-            </div>
-          ) : activeModel ? (
-            <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
-              <AceStudioIcon className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate max-w-[140px] sm:max-w-[190px] font-medium text-left">
-                {activeModel.displayName || activeModel.modelId}
-              </span>
-              <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-normal shrink-0">
-                {activeEffort}
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <AceStudioIcon className="w-3.5 h-3.5 shrink-0" />
-              <span className="font-medium">Select Model</span>
-            </div>
-          )}
-          <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0 ml-1" />
-        </motion.button>
-      </DropdownMenu.Trigger>
-
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          asChild
-          side="top"
-          align="start"
-          sideOffset={10}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: 8 }}
-            transition={{ type: "spring", stiffness: 450, damping: 28 }}
-            className="w-[340px] max-h-[460px] flex flex-col rounded-[22px] p-2.5 z-50 border shadow-[0_20px_50px_rgba(0,0,0,0.35)] bg-white/95 dark:bg-[#1e1f23]/95 backdrop-blur-2xl border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-neutral-100 focus:outline-none"
-          >
-            {/* Search bar */}
-            <div
-              className="flex items-center gap-2 rounded-xl px-2.5 h-8 mb-2 shrink-0 border bg-neutral-100 dark:bg-black/30 border-neutral-200 dark:border-white/5"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <Search className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-              <input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search models…"
-                className="w-full bg-transparent outline-none text-xs text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500"
+          <span className="font-medium select-none" style={{ color: "var(--text-primary)" }}>
+            Auto
+          </span>
+          <span className="auto-chevron mt-0.5" style={{ color: "var(--text-secondary)" }}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M4 6L8 10L12 6"
+                stroke="currentColor"
+                strokeWidth="1.65"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
-            </div>
-
-            {/* Auto Selector Row */}
-            <div
+            </svg>
+          </span>
+          <span className="auto-inline-switch">
+            <span
               onClick={(e) => {
                 e.stopPropagation();
-                setIsAuto(!isAuto);
+                onAutoChange(false);
               }}
-              className="flex items-center justify-between px-2.5 py-1.5 mb-1.5 rounded-xl text-xs hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer transition-colors"
+              className="ios-switch on"
+              title="Turn off Auto routing"
+              role="switch"
+              aria-checked="true"
             >
-              <div className="flex flex-col">
-                <span className="font-medium">Auto</span>
-                <span className="text-[10px] text-neutral-400">Dynamically routes by complexity</span>
-              </div>
-              <button
-                type="button"
-                className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${
-                  isAuto ? "bg-blue-500 dark:bg-blue-600" : "bg-neutral-300 dark:bg-white/20"
-                }`}
+              <span className="ios-switch-thumb" />
+            </span>
+          </span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onOpenChange(!open)}
+          className="model-trigger-btn"
+          aria-haspopup="true"
+          aria-expanded={open}
+        >
+          <ProviderBadge kind={activeModel?.provider?.kind} />
+          {activeModel ? (
+            <span className="flex items-baseline gap-1.5 whitespace-nowrap min-w-0">
+              <span
+                className="font-medium truncate max-w-[190px]"
+                style={{ color: "var(--text-primary)" }}
               >
-                <div
-                  className={`w-3 h-3 rounded-full bg-white transition-transform ${
-                    isAuto ? "translate-x-3" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
+                {activeModel.displayName || activeModel.modelId}
+              </span>
+              <span className="font-normal shrink-0" style={{ color: "var(--text-secondary)" }}>
+                {activeEffort}
+              </span>
+            </span>
+          ) : (
+            <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+              Select model
+            </span>
+          )}
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 16 16"
+            fill="none"
+            className="mt-0.5 shrink-0"
+            style={{ color: "var(--text-secondary)" }}
+            aria-hidden="true"
+          >
+            <path
+              d="M4 6L8 10L12 6"
+              stroke="currentColor"
+              strokeWidth="1.65"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      )}
 
-            {/* Quick Filter Bar */}
-            <div className="flex items-center gap-1 px-1 mb-2 shrink-0 border-b border-neutral-100 dark:border-white/5 pb-2">
-              {[
-                { id: "all", label: "All" },
-                { id: "fav", label: "★ Favourites" },
-                { id: "vision", label: "Vision" },
-                { id: "tools", label: "Tools" },
-              ].map((tag) => (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => setFilterTag(tag.id as FilterTag)}
-                  className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors cursor-pointer ${
-                    filterTag === tag.id
-                      ? "bg-[#c6f232] text-black font-semibold shadow-2xs"
-                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                  }`}
-                >
-                  {tag.label}
-                </button>
-              ))}
-            </div>
+      {/* Popover */}
+      <div
+        className={`glass-popover ${open ? "popover-visible" : "popover-hidden"} absolute left-0 bottom-0 w-[256px] rounded-[20px] p-2 z-30`}
+      >
+        {/* Collapsible search */}
+        <div
+          onMouseEnter={() => {
+            hoveringRowRef.current = false;
+            setHoveredKey(null);
+          }}
+          className={`search-row-wrap ${searchRevealed || searchQuery.length > 0 ? "revealed" : ""}`}
+        >
+          <div className="flex items-center gap-2 px-2.5 h-8 rounded-lg">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="flex-shrink-0"
+              style={{ color: "var(--text-secondary)" }}
+              aria-hidden="true"
+            >
+              <circle cx="7.2" cy="7.2" r="4.8" stroke="currentColor" strokeWidth="1.5" />
+              <path
+                d="M10.8 10.8L13.8 13.8"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search models"
+              autoComplete="off"
+              className="w-full bg-transparent border-none outline-none text-[14.5px] font-normal tracking-[-0.011em]"
+              style={{ color: "var(--text-primary)" }}
+              aria-label="Search models"
+            />
+          </div>
+        </div>
 
-            {/* Ordered Sections: Favourites -> Vision -> All Models */}
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+        {/* Auto row */}
+        <div
+          onMouseEnter={() => {
+            hoveringRowRef.current = false;
+            setHoveredKey(null);
+          }}
+          className="flex items-center justify-between px-2.5 h-9"
+        >
+          <span
+            className="text-[15px] font-medium tracking-[-0.011em]"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Auto
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={auto}
+            onClick={() => onAutoChange(!auto)}
+            className={`ios-switch ${auto ? "on" : ""}`}
+          >
+            <span className="ios-switch-thumb" />
+          </button>
+        </div>
+
+        {/* fav / all filter */}
+        <div
+          role="tablist"
+          aria-label="Filter models"
+          onMouseEnter={() => {
+            hoveringRowRef.current = false;
+            setHoveredKey(null);
+          }}
+          className="model-filter-bar"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filterTab === "fav"}
+            onClick={() => {
+              setFilterTab("fav");
+              setHoveredKey(null);
+            }}
+            className={`model-filter-pill ${filterTab === "fav" ? "active" : ""}`}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              fill={filterTab === "fav" ? "#FACC15" : "none"}
+              stroke={filterTab === "fav" ? "#FACC15" : "currentColor"}
+              strokeWidth="1.4"
+              strokeLinejoin="round"
+              className="flex-shrink-0"
+              aria-hidden="true"
+            >
+              <path d="M8 1.6L9.95 5.55L14.3 6.18L11.15 9.25L11.89 13.58L8 11.53L4.11 13.58L4.85 9.25L1.7 6.18L6.05 5.55L8 1.6Z" />
+            </svg>
+            <span>fav</span>
+            {favCount > 0 && (
+              <span
+                className="text-[11.5px] font-normal opacity-75"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {favCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filterTab === "all"}
+            onClick={() => {
+              setFilterTab("all");
+              setHoveredKey(null);
+            }}
+            className={`model-filter-pill ${filterTab === "all" ? "active" : ""}`}
+          >
+            <span>all</span>
+            <span
+              className="text-[11.5px] font-normal opacity-70"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {models.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Model rows */}
+        <div className="flex flex-col gap-0.5 max-h-[300px] overflow-y-auto composer-scroll">
+          {visibleModels.length === 0 ? (
+            <div
+              className="px-3 py-3 text-center text-[13px] tracking-[-0.01em]"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {models.length === 0 ? (
-                <div className="p-4 text-center">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
-                    No models discovered yet. Add a provider or local Ollama endpoint to begin.
-                  </p>
+                <>
+                  No models discovered yet.{" "}
                   <button
                     type="button"
                     onClick={() => {
-                      setOpen(false);
+                      onOpenChange(false);
                       onOpenProvidersModal();
                     }}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold bg-[#c6f232] text-black hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                    className="underline font-medium"
+                    style={{ color: "var(--text-primary)" }}
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Configure Providers</span>
+                    Add a provider
                   </button>
-                </div>
-              ) : filteredModels.length === 0 ? (
-                <div className="py-6 text-center text-xs text-neutral-500 dark:text-neutral-400">
-                  No matching models found.
-                </div>
+                  .
+                </>
+              ) : filterTab === "fav" ? (
+                <>
+                  No favourite models yet. Switch to{" "}
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("all")}
+                    className="underline font-medium"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    all
+                  </button>{" "}
+                  and press ★ to add.
+                </>
+              ) : searchQuery.trim() ? (
+                "No matching models"
               ) : (
-                orderedSections.map((section) => (
-                  <div key={section.id} className="space-y-0.5">
-                    <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <section.icon className="w-3 h-3 text-amber-400 dark:text-amber-300" />
-                        <span>{section.title}</span>
-                      </span>
-                      <span className="text-[10px] text-neutral-400 font-mono">
-                        {section.items.length}
-                      </span>
-                    </div>
-
-                    {section.items.map((m) => {
-                      const isSelected =
-                        !isAuto &&
-                        activeModel?.providerId === m.providerId &&
-                        activeModel?.modelId === m.modelId;
-                      const hasVision = checkVision(m);
-                      const currentEffort = selectedEffort[m.modelId] || "High";
-
-                      return (
-                        <DropdownMenu.Sub key={`${section.id}:${m.providerId}:${m.modelId}`}>
-                          <div
-                            onClick={() => {
-                              setIsAuto(false);
-                              onSelectModel({
-                                providerId: m.providerId,
-                                modelId: m.modelId,
-                                label: m.displayName || m.modelId,
-                              });
-                              setOpen(false);
-                            }}
-                            className={`flex items-center justify-between px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-colors group ${
-                              isSelected
-                                ? "bg-neutral-100 dark:bg-white/10 text-neutral-900 dark:text-white font-semibold"
-                                : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 min-w-0 pr-2">
-                              <ModelIcon type={m.provider?.kind || m.modelId} className="w-3.5 h-3.5 shrink-0" />
-                              <div className="min-w-0 flex flex-col">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="truncate font-medium">{m.displayName || m.modelId}</span>
-                                  {hasVision && (
-                                    <span title="Supports Vision / Images">
-                                      <Eye className="w-3 h-3 text-sky-400 shrink-0" />
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {/* Effort Trigger Submenu */}
-                              <DropdownMenu.SubTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-neutral-200/70 dark:bg-black/40 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white transition-colors cursor-pointer"
-                                  title="Change Reasoning Effort"
-                                >
-                                  {currentEffort}
-                                </button>
-                              </DropdownMenu.SubTrigger>
-
-                              {/* Star Favourite button — ALWAYS visible on all model rows */}
-                              {onToggleFavourite && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onToggleFavourite(m.providerId, m.modelId, m.favourite);
-                                  }}
-                                  className="p-1 rounded-md transition-all cursor-pointer flex items-center justify-center hover:scale-110 active:scale-95"
-                                  title={m.favourite ? "Remove from favourites" : "Add to favourites"}
-                                  aria-label={m.favourite ? "Remove from favourites" : "Add to favourites"}
-                                >
-                                  <Star
-                                    className={`w-3.5 h-3.5 transition-colors ${
-                                      m.favourite
-                                        ? "fill-amber-400 text-amber-400 stroke-amber-400"
-                                        : "fill-transparent text-neutral-300 dark:text-neutral-600 hover:text-amber-400 hover:fill-amber-400/20"
-                                    }`}
-                                  />
-                                </button>
-                              )}
-
-                              {isSelected && (
-                                <Check className="w-3.5 h-3.5 text-neutral-900 dark:text-white stroke-[2.5]" />
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Effort Submenu Flyout to the right matching reference video */}
-                          <DropdownMenu.Portal>
-                            <DropdownMenu.SubContent
-                              asChild
-                              sideOffset={8}
-                              alignOffset={-4}
-                            >
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.92, x: -6 }}
-                                animate={{ opacity: 1, scale: 1, x: 0 }}
-                                exit={{ opacity: 0, scale: 0.92, x: -6 }}
-                                transition={{ type: "spring", stiffness: 450, damping: 28 }}
-                                className="w-32 rounded-[18px] p-1.5 z-50 border shadow-2xl bg-white/95 dark:bg-[#242528]/95 backdrop-blur-2xl border-neutral-200/80 dark:border-white/10 text-neutral-900 dark:text-neutral-100 focus:outline-none"
-                              >
-                                <div className="px-2.5 py-1 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
-                                  Effort
-                                </div>
-                                {["Low", "Medium", "High", "Max"].map((eff) => (
-                                  <DropdownMenu.Item
-                                    key={eff}
-                                    onSelect={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedEffort((prev) => ({ ...prev, [m.modelId]: eff }));
-                                    }}
-                                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer outline-none transition-colors ${
-                                      currentEffort === eff
-                                        ? "bg-neutral-100 dark:bg-white/10 font-semibold text-neutral-900 dark:text-white"
-                                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                                    }`}
-                                  >
-                                    <span>{eff}</span>
-                                    {currentEffort === eff && (
-                                      <Check className="w-3 h-3 text-neutral-900 dark:text-white stroke-[2.5]" />
-                                    )}
-                                  </DropdownMenu.Item>
-                                ))}
-                              </motion.div>
-                            </DropdownMenu.SubContent>
-                          </DropdownMenu.Portal>
-                        </DropdownMenu.Sub>
-                      );
-                    })}
-                  </div>
-                ))
+                "No models available"
               )}
             </div>
+          ) : (
+            visibleModels.map((m) => {
+              const key = modelKey(m.providerId, m.modelId);
+              const isSelected = !auto && key === modelKey(selectedModel?.providerId ?? "", selectedModel?.modelId ?? "");
+              const isHovered = key === hoveredKey && searchQuery.trim().length === 0;
+              const effort = efforts[key] ?? DEFAULT_EFFORT;
 
-            {/* Footer: Manage Providers button */}
-            <div className="pt-2 mt-1 border-t border-neutral-100 dark:border-white/5 shrink-0">
+              return (
+                <div
+                  key={key}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => selectModel(m)}
+                  title={m.displayName || m.modelId}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      selectModel(m);
+                    }
+                  }}
+                  onMouseEnter={() => {
+                    clearHideEffortTimeout();
+                    hoveringRowRef.current = true;
+                    if (pointerReady) setHoveredKey(key);
+                  }}
+                  onMouseMove={() => {
+                    clearHideEffortTimeout();
+                    hoveringRowRef.current = true;
+                    if (!pointerReady) setPointerReady(true);
+                    if (hoveredKey !== key) setHoveredKey(key);
+                  }}
+                  onMouseLeave={() => {
+                    hoveringRowRef.current = false;
+                    scheduleHideEffort();
+                  }}
+                  className={`model-row ${isHovered ? "active-hover" : ""}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+                    <ProviderBadge kind={m.provider?.kind} />
+                    <span
+                      className="text-[14.5px] font-medium truncate"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {m.displayName || m.modelId}
+                    </span>
+                    <span
+                      className="text-[14.5px] font-normal shrink-0"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {effort}
+                    </span>
+                    {onToggleFavourite && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleFavourite(m.providerId, m.modelId, m.favourite);
+                        }}
+                        className={`fav-star-btn ${m.favourite ? "starred" : ""}`}
+                        title={m.favourite ? "Remove from favourites" : "Add to favourites"}
+                        aria-label={`Toggle favourite for ${m.displayName || m.modelId}`}
+                      >
+                        {m.favourite ? (
+                          <svg
+                            width="13.5"
+                            height="13.5"
+                            viewBox="0 0 16 16"
+                            fill="#FACC15"
+                            stroke="#FACC15"
+                            strokeWidth="1.2"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M8 1.6L9.95 5.55L14.3 6.18L11.15 9.25L11.89 13.58L8 11.53L4.11 13.58L4.85 9.25L1.7 6.18L6.05 5.55L8 1.6Z" />
+                          </svg>
+                        ) : (
+                          <svg
+                            width="13.5"
+                            height="13.5"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.35"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M8 1.6L9.95 5.55L14.3 6.18L11.15 9.25L11.89 13.58L8 11.53L4.11 13.58L4.85 9.25L1.7 6.18L6.05 5.55L8 1.6Z" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  {isSelected && <CheckmarkIcon />}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Manage providers */}
+        <div className="pt-1.5 mt-1.5" style={{ borderTop: "1px solid var(--card-border)" }}>
+          <button
+            type="button"
+            onClick={() => {
+              onOpenChange(false);
+              onOpenProvidersModal();
+            }}
+            className="w-full text-center text-[13px] py-1.5 rounded-[10px] transition-colors"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Manage providers &amp; keys
+          </button>
+        </div>
+      </div>
+
+      {/* Effort flyout */}
+      <div
+        onMouseEnter={() => {
+          clearHideEffortTimeout();
+          hoveringEffortRef.current = true;
+        }}
+        onMouseLeave={() => {
+          hoveringEffortRef.current = false;
+          scheduleHideEffort();
+        }}
+        style={{ bottom: `${effortBottomOffsetPx}px` }}
+        className={`glass-popover effort-submenu-bridge ${isEffortMenuVisible ? "popover-visible" : "popover-hidden"} absolute left-[266px] w-[148px] rounded-[18px] p-2 z-30`}
+      >
+        <div
+          className="px-2.5 py-1.5 text-[14.5px] font-medium tracking-[-0.011em]"
+          style={{ color: "var(--effort-header)" }}
+        >
+          Effort
+        </div>
+        <div className="flex flex-col gap-0.5">
+          {EFFORT_LEVELS.map((level) => {
+            const active = hoveredModel
+              ? (efforts[modelKey(hoveredModel.providerId, hoveredModel.modelId)] ?? DEFAULT_EFFORT) === level
+              : false;
+            return (
               <button
+                key={level}
                 type="button"
                 onClick={() => {
-                  setOpen(false);
-                  onOpenProvidersModal();
+                  if (!hoveredModel) return;
+                  onSelectEffort(hoveredModel.providerId, hoveredModel.modelId, level);
                 }}
-                className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                className="mode-menu-item h-[34px] px-2.5 text-[14.5px]"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Manage Custom Providers & Keys</span>
+                <span>{level}</span>
+                {active && <CheckmarkIcon />}
               </button>
-            </div>
-          </motion.div>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }

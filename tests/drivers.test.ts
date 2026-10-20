@@ -427,11 +427,11 @@ describe("resolveNodeDriver", () => {
     expect(resolved.kind).toBe("libsql-http");
   });
 
-  it("explains that Postgres URLs are not supported by the portable schema", async () => {
+  it("selects Neon when DATABASE_URL is a Postgres/Neon endpoint", async () => {
     const { resolveNodeDriver } = await import("../server/db/factory.js");
-    await expect(
-      resolveNodeDriver({ DATABASE_URL: "postgres://user:pw@host/db" }),
-    ).rejects.toThrow(/SQLite dialect/);
+    const resolved = await resolveNodeDriver({ DATABASE_URL: "postgres://user:pw@host/db" });
+    expect(resolved.kind).toBe("neon");
+    expect(resolved.needsMigrate).toBe(true);
   });
 
   it("refuses a missing database when a remote one is required", async () => {

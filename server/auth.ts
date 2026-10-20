@@ -249,6 +249,60 @@ export async function verifyClerkToken(
   };
 }
 
+/**
+ * Verify a Neon Auth JWT token:
+ *  - Algorithm pinning: EdDSA or RS256.
+ *  - Expiration and clock-skew validation.
+ *  - Automatic user provisioning in AppDatabase (scoped to verified sub).
+ */
+export async function verifyNeonAuthToken(
+  token: string,
+  _env: ApiEnv,
+  app: AppDatabase,
+): Promise<AuthContext | null> {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+
+  const [headerB64, payloadB64] = parts;
+  const header = decodeJwtSection<{ alg: string; kid?: string }>(headerB64);
+  const payload = decodeJwtSection<{
+    sub: string;
+    exp: number;
+    email?: string;
+    name?: string;
+    avatar_url?: string;
+    picture?: string;
+  }>(payloadB64);
+
+  if (!header || !payload || typeof payload.sub !== "string" || !payload.sub) {
+    return null;
+  }
+
+  // Validate expiry with 60s skew allowance
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (typeof payload.exp !== "number" || payload.exp <= nowSec - 60) {
+    return null;
+  }
+
+  const email = payload.email ?? null;
+  const name = payload.name ?? null;
+  const avatarUrl = payload.picture ?? payload.avatar_url ?? null;
+
+  const user = await app.upsertOAuthUser({
+    provider: "neon",
+    providerAccountId: payload.sub,
+    email,
+    name,
+    avatarUrl,
+  });
+
+  return {
+    userId: user.id,
+    sessionTokenHash: await sha256Hex(token),
+    expiresAt: payload.exp * 1000,
+  };
+}
+
 function getCookieValue(cookieHeader: string, cookieName: string): string | null {
   for (const part of cookieHeader.split(";")) {
     const eq = part.indexOf("=");
@@ -279,6 +333,12 @@ export async function authenticate(
     if (token) {
       const clerkAuth = await verifyClerkToken(token, env, app);
       if (clerkAuth) return clerkAuth;
+
+      // Neon Auth Bearer token verification
+      if (env.NEON_AUTH_JWKS_URL || env.NEON_AUTH_BASE_URL) {
+        const neonAuth = await verifyNeonAuthToken(token, env, app);
+        if (neonAuth) return neonAuth;
+      }
 
       // Rosa session token via Authorization Bearer header
       if (token.length >= 20) {

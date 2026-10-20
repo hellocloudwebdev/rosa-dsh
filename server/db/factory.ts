@@ -89,24 +89,30 @@ export async function resolveNodeDriver(
     return { driver, kind: "libsql-http", needsMigrate: true };
   }
 
+  // ---- Neon / Lakebase Postgres over HTTP -----------------------------
+  if (
+    isSet(env.DATABASE_URL) &&
+    (env.DATABASE_URL!.startsWith("postgres:") ||
+      env.DATABASE_URL!.startsWith("postgresql:") ||
+      env.DATABASE_URL!.includes("neon.tech"))
+  ) {
+    const { NeonDriver } = await import("./neon.js");
+    const driver = new NeonDriver({
+      connectionString: env.DATABASE_URL as string,
+    });
+    return { driver, kind: "neon", needsMigrate: true };
+  }
+
   // ---- Supabase / PostgreSQL over HTTP --------------------------------
   if (
     isSet(env.SUPABASE_DB_URL) ||
     (isSet(env.DATABASE_URL) && env.DATABASE_URL!.includes("supabase"))
   ) {
-    const { SupabaseDriver } = await import("./supabase.js");
-    const driver = new SupabaseDriver({
+    const { NeonDriver } = await import("./neon.js");
+    const driver = new NeonDriver({
       connectionString: (env.SUPABASE_DB_URL || env.DATABASE_URL) as string,
     });
     return { driver, kind: "supabase", needsMigrate: true };
-  }
-
-  // ---- Neon / Generic Postgres -----------------------------------------
-  if (isSet(env.DATABASE_URL) && (env.DATABASE_URL!.startsWith("postgres:") || env.DATABASE_URL!.startsWith("postgresql:"))) {
-    throw new Error(
-      "DATABASE_URL looks like Postgres/Neon. Rosa's portable schema is SQLite dialect " +
-        "(D1, libsql, node:sqlite). Use Supabase with SUPABASE_DB_URL, Cloudflare D1 over HTTP, or libsql/Turso instead.",
-    );
   }
 
   if (opts.requireRemote) throw new NoDatabaseConfiguredError();

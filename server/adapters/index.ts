@@ -22,6 +22,7 @@ const REGISTRY: Partial<Record<ProviderKind, () => ProviderAdapter>> = {
   anthropic: () => new AnthropicAdapter(),
   google: () => new GoogleAdapter(),
   "azure-openai": () => new AzureOpenAIAdapter(),
+  "neon-ai-gateway": () => new OpenAICompatibleAdapter(),
 };
 
 export function getAdapter(kind: ProviderKind): ProviderAdapter {

@@ -27,6 +27,19 @@ export interface ApiEnv {
   CLERK_DOMAIN?: string;
   CLERK_ISSUER?: string;
 
+  /* ---- Neon Services ---- */
+  NEON_BRANCH?: string;
+  DATABASE_URL_UNPOOLED?: string;
+  NEON_AUTH_BASE_URL?: string;
+  NEON_AUTH_JWKS_URL?: string;
+  NEON_AI_GATEWAY_TOKEN?: string;
+  NEON_AI_GATEWAY_BASE_URL?: string;
+  NEON_FUNCTION_HELLO_BASE_URL?: string;
+  AWS_ACCESS_KEY_ID?: string;
+  AWS_SECRET_ACCESS_KEY?: string;
+  AWS_ENDPOINT_URL_S3?: string;
+  AWS_REGION?: string;
+
   /* ---- Supabase Storage ---- */
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
