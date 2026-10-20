@@ -56,9 +56,41 @@ export function ModelMenu({
   const [pointerReady, setPointerReady] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const hoveringRowRef = useRef(false);
   const hoveringEffortRef = useRef(false);
   const hideEffortTimerRef = useRef<number | null>(null);
+
+  // The panel opens upwards by default, but must never run off the top of the
+  // viewport: measure the anchor on open and flip below when space is short.
+  const [placement, setPlacement] = useState<"above" | "below">("above");
+  const [availableHeight, setAvailableHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const measure = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const margin = 12;
+      const spaceAbove = rect.top - margin;
+      const spaceBelow = window.innerHeight - rect.bottom - margin;
+      const preferred = 380;
+      const next = spaceAbove >= preferred || spaceAbove >= spaceBelow ? "above" : "below";
+      setPlacement(next);
+      const space = next === "above" ? spaceAbove : spaceBelow;
+      setAvailableHeight(Math.max(180, Math.min(space, 520)));
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open]);
 
   const clearHideEffortTimeout = useCallback(() => {
     if (hideEffortTimerRef.current !== null) {
@@ -150,7 +182,11 @@ export function ModelMenu({
   };
 
   return (
-    <div className="rosa-chat-theme relative inline-flex items-center" data-theme={theme}>
+    <div
+      ref={rootRef}
+      className="rosa-chat-theme relative inline-flex items-center"
+      data-theme={theme}
+    >
       {auto ? (
         <div
           role="button"
@@ -243,7 +279,10 @@ export function ModelMenu({
 
       {/* Popover */}
       <div
-        className={`glass-popover ${open ? "popover-visible" : "popover-hidden"} absolute left-0 bottom-0 w-[256px] rounded-[20px] p-2 z-30`}
+        className={`glass-popover ${open ? "popover-visible" : "popover-hidden"} absolute left-0 ${
+          placement === "above" ? "bottom-0" : "top-[calc(100%+8px)]"
+        } w-[256px] rounded-[20px] p-2 z-30 flex flex-col`}
+        style={availableHeight ? { maxHeight: `${availableHeight}px` } : undefined}
       >
         {/* Collapsible search */}
         <div
@@ -375,7 +414,10 @@ export function ModelMenu({
         </div>
 
         {/* Model rows */}
-        <div className="flex flex-col gap-0.5 max-h-[300px] overflow-y-auto composer-scroll">
+        <div
+          className="flex flex-col gap-0.5 min-h-0 flex-1 overflow-y-auto composer-scroll"
+          style={{ maxHeight: availableHeight ? undefined : "300px" }}
+        >
           {visibleModels.length === 0 ? (
             <div
               className="px-3 py-3 text-center text-[13px] tracking-[-0.01em]"
