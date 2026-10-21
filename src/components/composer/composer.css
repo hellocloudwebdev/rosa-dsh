@@ -621,18 +621,22 @@
 }
 
 .rosa-chat-theme .model-row {
-  height: 38px;
+  min-height: 38px;
   width: 100%;
-  padding: 0 11px 0 6px;
-  border-radius: 9999px;
+  padding: 6px 11px 6px 6px;
+  border-radius: 14px;
   border: none;
   background: transparent;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  text-align: left;
   font-family: inherit;
   letter-spacing: -0.011em;
   cursor: pointer;
+  /* Rows grow when a long model name wraps; they must never be squashed by
+     the scrolling list's flex sizing, or the wrapped text spills over. */
+  flex-shrink: 0;
   transition: background-color 0.14s ease;
 }
 

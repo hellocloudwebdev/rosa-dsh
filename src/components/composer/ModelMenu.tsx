@@ -222,11 +222,15 @@ export function ModelMenu({
       const styles = getComputedStyle(panel);
       chrome += parseFloat(styles.paddingTop || "0") + parseFloat(styles.paddingBottom || "0");
       if (chrome > 0 && Math.abs(chrome - (chromeHeight ?? 0)) > 0.5) setChromeHeight(chrome);
-      const row = list.querySelector<HTMLElement>(".model-row");
-      if (row) {
-        const h = row.getBoundingClientRect().height;
-        if (h > 0 && Math.abs(h - rowHeight) > 0.5) setRowHeight(h);
+      // Rows grow when a long model name wraps onto a second line. Size the
+      // list from the shortest row so the catalogue keeps showing its usual
+      // number of entries; taller rows simply scroll into view.
+      let row = Infinity;
+      for (const el of Array.from(list.querySelectorAll<HTMLElement>(".model-row"))) {
+        const h = el.getBoundingClientRect().height;
+        if (h > 0) row = Math.min(row, h);
       }
+      if (Number.isFinite(row) && Math.abs(row - rowHeight) > 0.5) setRowHeight(row);
       const listStyles = getComputedStyle(list);
       const gap = parseFloat(listStyles.rowGap || listStyles.gap || "0");
       if (Number.isFinite(gap) && Math.abs(gap - rowGap) > 0.5) setRowGap(gap);
@@ -301,12 +305,13 @@ export function ModelMenu({
           className="model-trigger-btn"
           aria-haspopup="true"
           aria-expanded={open}
+          title={activeModel ? activeModel.displayName || activeModel.modelId : undefined}
         >
           <ProviderBadge kind={activeModel?.provider?.kind} />
           {activeModel ? (
             <span className="flex items-baseline gap-1.5 whitespace-nowrap min-w-0">
               <span
-                className="font-medium truncate max-w-[190px]"
+                className="font-medium truncate max-w-[240px]"
                 style={{ color: "var(--text-primary)" }}
               >
                 {activeModel.displayName || activeModel.modelId}
@@ -345,7 +350,7 @@ export function ModelMenu({
         ref={panelRef}
         className={`glass-popover ${open ? "popover-visible" : "popover-hidden"} absolute left-0 ${
           placement === "above" ? "bottom-0" : "top-[calc(100%+8px)]"
-        } w-[256px] rounded-[20px] p-2 z-30 flex flex-col`}
+        } w-[380px] max-w-[calc(100vw_-_32px)] rounded-[20px] p-2 z-30 flex flex-col`}
         style={undefined}
       >
         {/* Collapsible search */}
@@ -563,7 +568,7 @@ export function ModelMenu({
                   <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
                     <ProviderBadge kind={m.provider?.kind} />
                     <span
-                      className="text-[14.5px] font-medium truncate"
+                      className="text-[14.5px] font-medium flex-1 min-w-0 whitespace-normal break-words leading-[1.3]"
                       style={{ color: "var(--text-primary)" }}
                     >
                       {m.displayName || m.modelId}
@@ -649,7 +654,7 @@ export function ModelMenu({
           scheduleHideEffort();
         }}
         style={{ bottom: `${effortBottomOffsetPx}px` }}
-        className={`glass-popover effort-submenu-bridge ${isEffortMenuVisible ? "popover-visible" : "popover-hidden"} absolute left-[266px] w-[148px] rounded-[18px] p-2 z-30`}
+        className={`glass-popover effort-submenu-bridge ${isEffortMenuVisible ? "popover-visible" : "popover-hidden"} absolute left-[390px] w-[148px] rounded-[18px] p-2 z-30`}
       >
         <div
           className="px-2.5 py-1.5 text-[14.5px] font-medium tracking-[-0.011em]"
