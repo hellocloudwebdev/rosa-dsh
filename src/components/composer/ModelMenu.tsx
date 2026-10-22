@@ -15,6 +15,10 @@ const MAX_ROWS = 9;
 const MIN_ROWS = 3;
 /** Fallback chrome height (search, Auto row, filter bar, footer, padding). */
 const DEFAULT_CHROME_PX = 149;
+/** Panel width before the first measurement; the effort flyout starts here. */
+const NOMINAL_PANEL_WIDTH = 380;
+/** Width of the effort flyout, used to keep it on screen. */
+const EFFORT_FLYOUT_WIDTH = 148;
 
 export interface ModelSelection {
   providerId: string;
@@ -65,6 +69,7 @@ export function ModelMenu({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const effortFlyoutRef = useRef<HTMLDivElement | null>(null);
   const hoveringRowRef = useRef(false);
   const hoveringEffortRef = useRef(false);
   const hideEffortTimerRef = useRef<number | null>(null);
@@ -76,6 +81,13 @@ export function ModelMenu({
   const [chromeHeight, setChromeHeight] = useState<number | null>(null);
   const [rowHeight, setRowHeight] = useState(38);
   const [rowGap, setRowGap] = useState(2);
+  // Measured panel width, so the effort flyout sits beside the panel even when
+  // the viewport caps its width.
+  const [panelWidth, setPanelWidth] = useState(NOMINAL_PANEL_WIDTH);
+  // Where the anchor sits, so the effort flyout can be held inside the viewport.
+  const [anchorLeft, setAnchorLeft] = useState(0);
+  // Top of the effort flyout, level with the hovered row.
+  const [effortFlyoutTopPx, setEffortFlyoutTopPx] = useState(0);
 
   useEffect(() => {
     if (!open) return;
@@ -94,6 +106,7 @@ export function ModelMenu({
       const next = spaceAbove >= minimum || spaceAbove >= spaceBelow ? "above" : "below";
       setPlacement(next);
       setAvailableHeight(Math.max(0, next === "above" ? spaceAbove : spaceBelow));
+      if (Math.abs(rect.left - anchorLeft) > 0.5) setAnchorLeft(rect.left);
     };
 
     measure();
@@ -103,7 +116,7 @@ export function ModelMenu({
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
-  }, [open, chromeHeight, rowHeight, rowGap]);
+  }, [open, chromeHeight, rowHeight, rowGap, anchorLeft]);
 
   const clearHideEffortTimeout = useCallback(() => {
     if (hideEffortTimerRef.current !== null) {
@@ -173,20 +186,108 @@ export function ModelMenu({
     [models, hoveredKey],
   );
 
-  // Track the hovered row so the effort flyout glides vertically with it.
-  const effortBottomOffsetPx = useMemo(() => {
-    if (!hoveredKey) return 0;
-    const idx = visibleModels.findIndex((m) => modelKey(m.providerId, m.modelId) === hoveredKey);
-    if (idx < 0) return 0;
-    const rowsFromBottom = visibleModels.length - 1 - idx;
-    return rowsFromBottom <= 1 ? 0 : Math.min(96, (rowsFromBottom - 1) * 24);
-  }, [visibleModels, hoveredKey]);
-
   const isEffortMenuVisible = open && searchQuery.trim().length === 0 && hoveredModel !== null;
 
+  // Beside the panel, but never past the right edge: on a narrow window the
+  // flyout slides back over the panel rather than running off screen.
+  const effortFlyoutLeftPx = useMemo(() => {
+    const preferred = panelWidth + 10;
+    if (typeof window === "undefined") return preferred;
+    const roomFor = window.innerWidth - anchorLeft - EFFORT_FLYOUT_WIDTH - 10;
+    return Math.max(0, Math.min(preferred, roomFor));
+  }, [panelWidth, anchorLeft]);
+
+  const rowElements = useCallback(
+    () => Array.from(listRef.current?.querySelectorAll<HTMLElement>(".model-row") ?? []),
+    [],
+  );
+
+  // The flyout sits level with the hovered row and is clamped to the panel, so
+  // it stays attached to its row now that rows may wrap to two or three lines.
+  // It is positioned against the anchor, the same origin the panel uses.
+  useEffect(() => {
+    if (!open || !hoveredKey) return;
+    const id = window.requestAnimationFrame(() => {
+      const anchor = rootRef.current;
+      const panel = panelRef.current;
+      const row = rowElements().find((el) => el.dataset.modelKey === hoveredKey);
+      if (!anchor || !panel || !row) return;
+      const anchorRect = anchor.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const flyoutHeight = effortFlyoutRef.current?.getBoundingClientRect().height ?? 0;
+      const minimum = panelRect.top - anchorRect.top + 8;
+      const maximum = Math.max(minimum, panelRect.bottom - anchorRect.top - flyoutHeight - 8);
+      setEffortFlyoutTopPx(
+        Math.max(minimum, Math.min(rowRect.top - anchorRect.top, maximum)),
+      );
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [open, hoveredKey, rowElements, rowHeight, panelWidth]);
+
+  /** Keeps a row inside the scrolling list without scrolling the page. */
+  const revealRow = useCallback((key: string) => {
+    const list = listRef.current;
+    if (!list) return;
+    const row = Array.from(list.querySelectorAll<HTMLElement>(".model-row")).find(
+      (el) => el.dataset.modelKey === key,
+    );
+    if (!row) return;
+    const listRect = list.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    if (rowRect.top < listRect.top) list.scrollTop -= listRect.top - rowRect.top;
+    else if (rowRect.bottom > listRect.bottom) list.scrollTop += rowRect.bottom - listRect.bottom;
+  }, []);
+
+  // Arrow keys walk the catalogue through the same hover state the pointer
+  // sets, so the highlight and the effort flyout follow either input.
+  const moveActive = useCallback(
+    (delta: number, takeFocus: boolean) => {
+      if (visibleModels.length === 0) return;
+      let current = hoveredKey
+        ? visibleModels.findIndex((m) => modelKey(m.providerId, m.modelId) === hoveredKey)
+        : -1;
+      if (current < 0) {
+        // Nothing active yet: start at the selection when there is one,
+        // otherwise at the end the arrow points away from.
+        current = selectedModel
+          ? visibleModels.findIndex(
+              (m) =>
+                m.providerId === selectedModel.providerId && m.modelId === selectedModel.modelId,
+            )
+          : -1;
+        if (current < 0) current = delta > 0 ? -1 : visibleModels.length;
+      }
+      const next = Math.min(visibleModels.length - 1, Math.max(0, current + delta));
+      const target = visibleModels[next];
+      const key = modelKey(target.providerId, target.modelId);
+      setHoveredKey(key);
+      setPointerReady(true);
+      if (takeFocus) {
+        rowElements()
+          .find((row) => row.dataset.modelKey === key)
+          ?.focus({ preventScroll: true });
+      }
+      revealRow(key);
+    },
+    [hoveredKey, rowElements, selectedModel, visibleModels, revealRow],
+  );
+
+  const selectedRowKey = selectedModel
+    ? modelKey(selectedModel.providerId, selectedModel.modelId)
+    : null;
+
+  // Open the catalogue on the current selection rather than at the top: with
+  // hundreds of models the chosen one is otherwise far off screen.
+  useEffect(() => {
+    if (!open || auto || !selectedRowKey) return;
+    const id = window.requestAnimationFrame(() => revealRow(selectedRowKey));
+    return () => window.cancelAnimationFrame(id);
+  }, [open, auto, selectedRowKey, filterTab, searchQuery, revealRow]);
+
   // The catalogue shows at most nine rows and never fewer than three. The list
-  // is sized by row count and snapped to a row boundary, so a row is never
-  // sliced and the panel never grows past the space it was given.
+  // is sized from the shortest row it holds, so a wrapped name takes extra room
+  // by scrolling rather than by shrinking the catalogue.
   const listMaxHeightPx = useMemo(() => {
     const ROW = rowHeight;
     const GAP = rowGap;
@@ -231,12 +332,14 @@ export function ModelMenu({
         if (h > 0) row = Math.min(row, h);
       }
       if (Number.isFinite(row) && Math.abs(row - rowHeight) > 0.5) setRowHeight(row);
+      const width = panel.getBoundingClientRect().width;
+      if (width > 0 && Math.abs(width - panelWidth) > 0.5) setPanelWidth(width);
       const listStyles = getComputedStyle(list);
       const gap = parseFloat(listStyles.rowGap || listStyles.gap || "0");
       if (Number.isFinite(gap) && Math.abs(gap - rowGap) > 0.5) setRowGap(gap);
     });
     return () => window.cancelAnimationFrame(id);
-  }, [open, searchRevealed, filterTab, chromeHeight, rowHeight, rowGap]);
+  }, [open, searchRevealed, filterTab, chromeHeight, rowHeight, rowGap, panelWidth]);
 
   const selectModel = (m: ModelWithProvider) => {
     onSelectModel({
@@ -253,6 +356,17 @@ export function ModelMenu({
       ref={rootRef}
       className="rosa-chat-theme relative inline-flex items-center"
       data-theme={theme}
+      onKeyDown={(e) => {
+        if (!open) return;
+        if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+        // Arrow keys never move the caret inside the search field; they walk
+        // the list, but keep focus in the field so typing can continue.
+        const typing =
+          e.target instanceof HTMLElement &&
+          (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
+        e.preventDefault();
+        moveActive(e.key === "ArrowDown" ? 1 : -1, !typing);
+      }}
     >
       {auto ? (
         <div
@@ -485,6 +599,8 @@ export function ModelMenu({
         {/* Model rows */}
         <div
           ref={listRef}
+          role={visibleModels.length > 0 ? "listbox" : undefined}
+          aria-label={visibleModels.length > 0 ? "Models" : undefined}
           className="flex flex-col gap-0.5 min-h-0 flex-1 overflow-y-auto composer-scroll"
           style={{ maxHeight: `${listMaxHeightPx}px` }}
         >
@@ -538,13 +654,16 @@ export function ModelMenu({
               return (
                 <div
                   key={key}
-                  role="button"
+                  role="option"
+                  aria-selected={isSelected}
                   tabIndex={0}
+                  data-model-key={key}
                   onClick={() => selectModel(m)}
                   title={m.displayName || m.modelId}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
+                      e.stopPropagation();
                       selectModel(m);
                     }
                   }}
@@ -645,6 +764,7 @@ export function ModelMenu({
 
       {/* Effort flyout */}
       <div
+        ref={effortFlyoutRef}
         onMouseEnter={() => {
           clearHideEffortTimeout();
           hoveringEffortRef.current = true;
@@ -653,8 +773,8 @@ export function ModelMenu({
           hoveringEffortRef.current = false;
           scheduleHideEffort();
         }}
-        style={{ bottom: `${effortBottomOffsetPx}px` }}
-        className={`glass-popover effort-submenu-bridge ${isEffortMenuVisible ? "popover-visible" : "popover-hidden"} absolute left-[390px] w-[148px] rounded-[18px] p-2 z-30`}
+        style={{ left: effortFlyoutLeftPx, top: effortFlyoutTopPx }}
+        className={`glass-popover effort-submenu-bridge ${isEffortMenuVisible ? "popover-visible" : "popover-hidden"} absolute w-[148px] rounded-[18px] p-2 z-30`}
       >
         <div
           className="px-2.5 py-1.5 text-[14.5px] font-medium tracking-[-0.011em]"
