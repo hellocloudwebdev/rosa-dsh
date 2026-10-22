@@ -228,9 +228,11 @@ export function App() {
 
       // Session
       let sess = await getSession();
-      if (!sess.user && !isSignedIn) {
+      // The dev-only local user is offered by the server's health payload, so
+      // production never asks for it (it would only be refused with a 403).
+      const localAvailable = health?.auth?.includes("local") ?? false;
+      if (!sess.user && !isSignedIn && localAvailable) {
         try {
-          // Attempt local dev sign-in
           const localLogin = await loginLocal();
           if (localLogin.user) {
             sess = { user: localLogin.user };
@@ -250,6 +252,11 @@ export function App() {
           createdAt: Date.now(),
         });
       }
+
+      // Everything below is private to a signed-in user, so a visitor who has
+      // no session and no Clerk identity skips it instead of collecting 401s.
+      // This effect re-runs when Clerk resolves, which is when the data loads.
+      if (!sess.user && !clerkUser) return;
 
       // Prefs
       const prefs = await getPrefs();

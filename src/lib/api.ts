@@ -53,6 +53,40 @@ async function resolveToken(): Promise<string | null> {
   return getStoredToken();
 }
 
+/**
+ * The dev-only "local" sign-in is the one thing `apiFetch` may try on its own
+ * when a request is rejected. Production deployments refuse it by design, so
+ * probe once and never ask again: without this every signed-out page load fired
+ * a burst of 403s at `/api/auth/local/start`, one per rejected request.
+ */
+let localAuthProbe: Promise<boolean> | null = null;
+let localAuthUnavailable = false;
+
+async function canSignInLocally(): Promise<boolean> {
+  if (localAuthUnavailable) return false;
+  // The boot sequence already fetched health; reuse it instead of asking again.
+  if (cachedHealth) {
+    const available = Array.isArray(cachedHealth.auth) && cachedHealth.auth.includes("local");
+    if (!available) localAuthUnavailable = true;
+    return available;
+  }
+  if (!localAuthProbe) {
+    localAuthProbe = (async () => {
+      try {
+        const res = await fetch("/api/health", { headers: { Accept: "application/json" } });
+        if (!res.ok) return false;
+        const data = (await res.json()) as { auth?: unknown };
+        return Array.isArray(data.auth) && data.auth.includes("local");
+      } catch {
+        return false;
+      }
+    })();
+  }
+  const available = await localAuthProbe;
+  if (!available) localAuthUnavailable = true;
+  return available;
+}
+
 /** Standard authenticated fetch for Rosa API */
 export async function apiFetch(
   endpoint: string,
@@ -76,8 +110,8 @@ export async function apiFetch(
     credentials: "include",
   });
 
-  // Auto-login locally if unauthorized in development
-  if (res.status === 401 && retryAuth) {
+  // Auto-login locally if unauthorized in development.
+  if (res.status === 401 && retryAuth && (await canSignInLocally())) {
     try {
       const loginRes = await fetch("/api/auth/local/start", {
         method: "POST",
@@ -94,6 +128,8 @@ export async function apiFetch(
     } catch {
       /* ignore */
     }
+    // Offered but refused: stop trying, so a signed-out session stays quiet.
+    localAuthUnavailable = true;
   }
 
   return res;
@@ -102,6 +138,9 @@ export async function apiFetch(
 /* ------------------------------------------------------------------ */
 /* Auth & Session                                                      */
 /* ------------------------------------------------------------------ */
+
+/** Last successful `/api/health` payload, shared with the sign-in probe below. */
+let cachedHealth: { auth: string[] } | null = null;
 
 export async function getHealth(): Promise<{
   ok: boolean;
@@ -112,7 +151,14 @@ export async function getHealth(): Promise<{
   try {
     const res = await fetch("/api/health", { headers: { Accept: "application/json" } });
     if (!res.ok) return null;
-    return await res.json();
+    const data = (await res.json()) as {
+      ok: boolean;
+      auth: string[];
+      oauthConfigured: boolean;
+      keyStorage: string;
+    };
+    cachedHealth = data;
+    return data;
   } catch {
     return null;
   }
